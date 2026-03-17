@@ -64,14 +64,16 @@ client.on("interactionCreate", async (interaction) => {
             const severity = interaction.options.getNumber("severity") ?? 0.4;
             const duration = interaction.options.getInteger("duration") ?? 30;
             const reason   = interaction.options.getString("reason") ?? "Market correction";
-            await pushCommandToRoblox({ type: "CRASH", severity, duration, reason, issuedBy: interaction.user.tag, issuedAt: Date.now() });
+            const stockC = interaction.options.getString('stock') || null;
+            await pushCommandToRoblox({ type: "CRASH", severity, duration, reason, symbol: stockC, issuedBy: interaction.user.tag, issuedAt: Date.now() });
             await interaction.editReply({ embeds: [embed("Market Crash Triggered", `**Severity:** -${Math.round(severity * 100)}%\n**Duration:** ${duration}s\n**Reason:** ${reason}`, 0xff4444)] });
 
         } else if (cmd === "boom") {
             const multiplier = interaction.options.getNumber("multiplier") ?? 1.3;
             const duration   = interaction.options.getInteger("duration") ?? 30;
             const reason     = interaction.options.getString("reason") ?? "Bull run";
-            await pushCommandToRoblox({ type: "BOOM", multiplier, duration, reason, issuedBy: interaction.user.tag, issuedAt: Date.now() });
+            const stockB = interaction.options.getString('stock') || null;
+            await pushCommandToRoblox({ type: "BOOM", multiplier, duration, reason, symbol: stockB, issuedBy: interaction.user.tag, issuedAt: Date.now() });
             await interaction.editReply({ embeds: [embed("Market Boom Triggered", `**Surge:** +${Math.round((multiplier - 1) * 100)}%\n**Duration:** ${duration}s\n**Reason:** ${reason}`, 0x26a69a)] });
 
         } else if (cmd === "givemoney") {
@@ -93,7 +95,8 @@ client.on("interactionCreate", async (interaction) => {
 
         } else if (cmd === "freeze") {
             const duration = interaction.options.getInteger("duration") ?? 60;
-            await pushCommandToRoblox({ type: "FREEZE", duration, issuedBy: interaction.user.tag, issuedAt: Date.now() });
+            const stockF = interaction.options.getString('stock') || null;
+            await pushCommandToRoblox({ type: "FREEZE", duration, symbol: stockF, issuedBy: interaction.user.tag, issuedAt: Date.now() });
             await interaction.editReply({ embeds: [embed("Market Frozen", `Trading halted for **${duration}s**`, 0x787b86)] });
 
         } else if (cmd === "unfreeze") {
@@ -102,7 +105,8 @@ client.on("interactionCreate", async (interaction) => {
 
         } else if (cmd === "setregime") {
             const regime = interaction.options.getString("regime");
-            await pushCommandToRoblox({ type: "SET_REGIME", regime, issuedBy: interaction.user.tag, issuedAt: Date.now() });
+            const stockR = interaction.options.getString('stock') || null;
+            await pushCommandToRoblox({ type: "SET_REGIME", regime, symbol: stockR, issuedBy: interaction.user.tag, issuedAt: Date.now() });
             await interaction.editReply({ embeds: [embed("Regime Set", `Market forced into **${regime}** mode`, regime === "BULL" ? 0x26a69a : regime === "BEAR" ? 0xff4444 : 0x787b86)] });
 
         } else if (cmd === "resetdata") {
@@ -114,7 +118,8 @@ client.on("interactionCreate", async (interaction) => {
 
         } else if (cmd === "setprice") {
             const price = interaction.options.getNumber("price");
-            await pushCommandToRoblox({ type: "SET_PRICE", price, issuedBy: interaction.user.tag, issuedAt: Date.now() });
+            const stockP = interaction.options.getString('stock') || null;
+            await pushCommandToRoblox({ type: "SET_PRICE", price, symbol: stockP, issuedBy: interaction.user.tag, issuedAt: Date.now() });
             await interaction.editReply({ embeds: [embed("Price Set", `Market price set to **$${price.toLocaleString()}**`, 0xf5a623)] });
         }
 
