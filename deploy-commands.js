@@ -1,25 +1,28 @@
-// Run once to register slash commands with Discord:
-//   node deploy-commands.js
-
 require("dotenv").config();
 const { REST, Routes, SlashCommandBuilder } = require("discord.js");
+
+const stockChoices = [
+    { name: "PLHR - Placeholder Corp", value: "PLHR" },
+    { name: "VLTX - Voltex Industries", value: "VLTX" },
+    { name: "NXCR - Nexcore Systems",   value: "NXCR" },
+];
 
 const commands = [
     new SlashCommandBuilder()
         .setName("crash")
         .setDescription("Trigger a market crash")
-        .addStringOption(o => o.setName('stock').setDescription('Target stock: PLHR, VLTX, NXCR (blank = all)').addChoices({name:'PLHR',value:'PLHR'},{name:'VLTX',value:'VLTX'},{name:'NXCR',value:'NXCR'}))
-        .addNumberOption(o => o.setName("severity").setDescription("Drop fraction 0.1–0.8 (default 0.4 = -40%)").setMinValue(0.05).setMaxValue(0.8))
+        .addNumberOption(o => o.setName("severity").setDescription("Drop fraction 0.1-0.8 (default 0.4 = -40%)").setMinValue(0.05).setMaxValue(0.8))
         .addIntegerOption(o => o.setName("duration").setDescription("Seconds to force bear regime (default 30)").setMinValue(5).setMaxValue(300))
-        .addStringOption(o => o.setName("reason").setDescription("Reason shown in-game")),
+        .addStringOption(o => o.setName("reason").setDescription("Reason shown in-game"))
+        .addStringOption(o => o.setName("stock").setDescription("Target stock (blank = all)").addChoices(...stockChoices)),
 
     new SlashCommandBuilder()
         .setName("boom")
         .setDescription("Trigger a market boom")
-        .addStringOption(o => o.setName('stock').setDescription('Target stock: PLHR, VLTX, NXCR (blank = all)').addChoices({name:'PLHR',value:'PLHR'},{name:'VLTX',value:'VLTX'},{name:'NXCR',value:'NXCR'}))
         .addNumberOption(o => o.setName("multiplier").setDescription("Price multiplier e.g. 1.3 = +30% (default 1.3)").setMinValue(1.05).setMaxValue(3.0))
         .addIntegerOption(o => o.setName("duration").setDescription("Seconds to force bull regime (default 30)").setMinValue(5).setMaxValue(300))
-        .addStringOption(o => o.setName("reason").setDescription("Reason shown in-game")),
+        .addStringOption(o => o.setName("reason").setDescription("Reason shown in-game"))
+        .addStringOption(o => o.setName("stock").setDescription("Target stock (blank = all)").addChoices(...stockChoices)),
 
     new SlashCommandBuilder()
         .setName("givemoney")
@@ -41,8 +44,8 @@ const commands = [
     new SlashCommandBuilder()
         .setName("freeze")
         .setDescription("Freeze the market (halt all trading)")
-        .addStringOption(o => o.setName('stock').setDescription('Target stock: PLHR, VLTX, NXCR (blank = all)').addChoices({name:'PLHR',value:'PLHR'},{name:'VLTX',value:'VLTX'},{name:'NXCR',value:'NXCR'}))
-        .addIntegerOption(o => o.setName("duration").setDescription("Seconds to freeze (default 60)").setMinValue(5).setMaxValue(3600)),
+        .addIntegerOption(o => o.setName("duration").setDescription("Seconds to freeze (default 60)").setMinValue(5).setMaxValue(3600))
+        .addStringOption(o => o.setName("stock").setDescription("Target stock (blank = all)").addChoices(...stockChoices)),
 
     new SlashCommandBuilder()
         .setName("unfreeze")
@@ -51,16 +54,14 @@ const commands = [
     new SlashCommandBuilder()
         .setName("setregime")
         .setDescription("Force the market into a specific regime")
-        .addStringOption(o => o.setName('stock').setDescription('Target stock: PLHR, VLTX, NXCR (blank = all)').addChoices({name:'PLHR',value:'PLHR'},{name:'VLTX',value:'VLTX'},{name:'NXCR',value:'NXCR'}))
-        .addStringOption(o => o
-            .setName("regime")
-            .setDescription("Market regime")
-            .setRequired(true)
+        .addStringOption(o => o.setName("regime").setDescription("Market regime").setRequired(true)
             .addChoices(
-                { name: "Bull (rising)", value: "BULL" },
-                { name: "Bear (falling)", value: "BEAR" },
-                { name: "Sideways (flat)", value: "SIDEWAYS" }
-            )),
+                { name: "Bull (rising)",    value: "BULL"     },
+                { name: "Bear (falling)",   value: "BEAR"     },
+                { name: "Sideways (flat)",  value: "SIDEWAYS" }
+            ))
+        .addStringOption(o => o.setName("stock").setDescription("Target stock (blank = all)").addChoices(...stockChoices)),
+
     new SlashCommandBuilder()
         .setName("resetdata")
         .setDescription("Wipe a player's balance and shares back to default")
@@ -70,8 +71,8 @@ const commands = [
     new SlashCommandBuilder()
         .setName("setprice")
         .setDescription("Set the market price to a specific value")
-        .addStringOption(o => o.setName('stock').setDescription('Target stock: PLHR, VLTX, NXCR (blank = all)').addChoices({name:'PLHR',value:'PLHR'},{name:'VLTX',value:'VLTX'},{name:'NXCR',value:'NXCR'}))
-        .addNumberOption(o => o.setName("price").setDescription("New price in dollars").setRequired(true).setMinValue(0.01).setMaxValue(999999)),
+        .addNumberOption(o => o.setName("price").setDescription("New price in dollars").setRequired(true).setMinValue(0.01).setMaxValue(999999))
+        .addStringOption(o => o.setName("stock").setDescription("Target stock (blank = PLHR)").addChoices(...stockChoices)),
 
 ].map(c => c.toJSON());
 
