@@ -93,7 +93,7 @@ async function getRobloxUsername(userId) {
 const pendingLinks = new Map();
 
 // ── Discord bot ───────────────────────────────────────────────
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers] });
 
 client.once("ready", () => {
     console.log(`[Bot] Logged in as ${client.user.tag}`);
@@ -104,6 +104,22 @@ client.once("ready", () => {
 // Prevent unhandled errors from crashing the bot
 process.on("unhandledRejection", (err) => {
     console.error("[Bot] Unhandled rejection:", err.message);
+});
+
+// Auto-role new members
+const AUTO_ROLE_ID = "1483427463504724039";
+client.on("guildMemberAdd", async (member) => {
+    try {
+        const role = member.guild.roles.cache.get(AUTO_ROLE_ID);
+        if (role) {
+            await member.roles.add(role);
+            console.log(`[AutoRole] Gave ${member.user.tag} the Players role`);
+        } else {
+            console.warn(`[AutoRole] Role ${AUTO_ROLE_ID} not found in guild`);
+        }
+    } catch (err) {
+        console.error(`[AutoRole] Failed to add role: ${err.message}`);
+    }
 });
 
 async function pollLinkVerifications() {
