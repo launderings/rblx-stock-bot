@@ -25,6 +25,11 @@ const commands = [
         .setName("richlist")
         .setDescription("See the top 10 wealthiest players"),
 
+    new SlashCommandBuilder()
+        .setName("blackjack")
+        .setDescription("Play blackjack using your in-game balance")
+        .addNumberOption(o => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1).setMaxValue(1000000)),
+
     // ── Admin ─────────────────────────────────────────────────
     new SlashCommandBuilder()
         .setName("crash")
