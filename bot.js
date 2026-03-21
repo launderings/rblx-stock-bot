@@ -340,7 +340,7 @@ client.on("interactionCreate", async (interaction) => {
         return;
     }
 
-    if (cmd === "richlist") {
+    if (cmd === "leaderboard") {
         await interaction.deferReply();
         try {
             // Read richlist from DataStore (maintained by Roblox server)
