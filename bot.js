@@ -345,35 +345,21 @@ client.on("interactionCreate", async (interaction) => {
             const stockP = interaction.options.getString("stock") || null;
             await pushCommandToRoblox({ type: "SET_PRICE", price, symbol: stockP, issuedBy: interaction.user.tag, issuedAt: Date.now() });
             await interaction.editReply({ embeds: [embed("Price Set", `Market price set to **$${price.toLocaleString()}**`, 0xf5a623)] });
+
+        } else if (cmd === "purge") {
+            const amount = interaction.options.getInteger("amount");
+            await interaction.deferReply({ ephemeral: true });
+            try {
+                const deleted = await interaction.channel.bulkDelete(amount, true);
+                await interaction.editReply(`🗑️ Deleted **${deleted.size}** message${deleted.size !== 1 ? "s" : ""}.`);
+            } catch (err) {
+                await interaction.editReply(`Error: ${err.message}`);
+            }
         }
 
     } catch (err) {
         console.error("[Bot] Error:", err.message);
         await interaction.editReply(`Error: ${err.message}`);
-    }
-});
-
-// Purge command (prefix-based, not slash — avoids needing message content intent issues)
-client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;
-    if (ALLOWED_GUILD_ID && message.guildId !== ALLOWED_GUILD_ID) return;
-    if (!message.content.startsWith("!purge")) return;
-    // Check admin role
-    if (ADMIN_ROLE_ID && !message.member.roles.cache.has(ADMIN_ROLE_ID)) {
-        return message.reply("You don't have permission to use this command.");
-    }
-    const args = message.content.split(" ");
-    const amount = parseInt(args[1]);
-    if (!amount || amount < 1 || amount > 100) {
-        return message.reply("Usage: `!purge <1-100>`");
-    }
-    try {
-        await message.delete();
-        const deleted = await message.channel.bulkDelete(amount, true);
-        const confirm = await message.channel.send(`🗑️ Deleted **${deleted.size}** message${deleted.size !== 1 ? "s" : ""}.`);
-        setTimeout(() => confirm.delete().catch(() => {}), 3000);
-    } catch (err) {
-        message.channel.send(`Error: ${err.message}`).then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
     }
 });
 
