@@ -8,6 +8,24 @@ const stockChoices = [
 ];
 
 const commands = [
+    // ── Economy (public) ──────────────────────────────────────
+    new SlashCommandBuilder()
+        .setName("link")
+        .setDescription("Link your Discord account to your Roblox account"),
+
+    new SlashCommandBuilder()
+        .setName("balance")
+        .setDescription("Check your in-game cash balance"),
+
+    new SlashCommandBuilder()
+        .setName("portfolio")
+        .setDescription("View your full portfolio — balance, shares, and net worth"),
+
+    new SlashCommandBuilder()
+        .setName("richlist")
+        .setDescription("See the top 10 wealthiest players"),
+
+    // ── Admin ─────────────────────────────────────────────────
     new SlashCommandBuilder()
         .setName("crash")
         .setDescription("Trigger a market crash")
@@ -56,9 +74,9 @@ const commands = [
         .setDescription("Force the market into a specific regime")
         .addStringOption(o => o.setName("regime").setDescription("Market regime").setRequired(true)
             .addChoices(
-                { name: "Bull (rising)",    value: "BULL"     },
-                { name: "Bear (falling)",   value: "BEAR"     },
-                { name: "Sideways (flat)",  value: "SIDEWAYS" }
+                { name: "Bull (rising)",   value: "BULL"     },
+                { name: "Bear (falling)",  value: "BEAR"     },
+                { name: "Sideways (flat)", value: "SIDEWAYS" }
             ))
         .addStringOption(o => o.setName("stock").setDescription("Target stock (blank = all)").addChoices(...stockChoices)),
 
