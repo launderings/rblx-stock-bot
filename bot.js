@@ -497,10 +497,20 @@ async function updateBalance(robloxUserId, newBalance) {
     // Read current data
     const data = await dsRequest("GET", "StockGame_v1", String(robloxUserId));
     if (!data) throw new Error("Player data not found");
-    // Write updated balance
-    const updated = { ...data, balance: newBalance };
+    // Write updated balance back in same format Roblox expects
+    const updated = { ...data, balance: Math.round(newBalance * 100) / 100 };
     await dsRequest("SET", "StockGame_v1", String(robloxUserId), updated);
-    return newBalance;
+    // Also send a live command to update in-memory balance if player is online
+    try {
+        await pushCommandToRoblox({
+            type: "SET_BALANCE",
+            robloxUserId: robloxUserId,
+            balance: updated.balance,
+            issuedBy: "Blackjack",
+            issuedAt: Date.now(),
+        });
+    } catch {}
+    return updated.balance;
 }
 
 // Handle blackjack button interactions
