@@ -174,7 +174,7 @@ client.on("interactionCreate", async (interaction) => {
     const cmd = interaction.commandName;
 
     // ── Economy commands (no admin required) ─────────────────
-    if (cmd === "blackjack") {
+    if (cmd === "blackjack" || cmd === "bj") {
         await interaction.deferReply();
         try {
             const bet = interaction.options.getNumber("bet");
