@@ -101,6 +101,11 @@ client.once("ready", () => {
     setInterval(pollLinkVerifications, 5000);
 });
 
+// Prevent unhandled errors from crashing the bot
+process.on("unhandledRejection", (err) => {
+    console.error("[Bot] Unhandled rejection:", err.message);
+});
+
 async function pollLinkVerifications() {
     if (pendingLinks.size === 0) return;
     const now = Date.now();
@@ -494,12 +499,16 @@ function bjEmbed(playerHand, dealerHand, bet, balance, status, hideDealer = true
 const activeGames = new Map();
 
 async function updateBalance(robloxUserId, newBalance) {
+    console.log(`[BJ] updateBalance called: userId=${robloxUserId} newBalance=${newBalance}`);
     // Read current data
     const data = await dsRequest("GET", "StockGame_v1", String(robloxUserId));
+    console.log(`[BJ] current data from DS:`, JSON.stringify(data));
     if (!data) throw new Error("Player data not found");
-    // Write updated balance back in same format Roblox expects
+    // Write updated balance back
     const updated = { ...data, balance: Math.round(newBalance * 100) / 100 };
+    console.log(`[BJ] writing updated data:`, JSON.stringify(updated));
     await dsRequest("SET", "StockGame_v1", String(robloxUserId), updated);
+    console.log(`[BJ] DataStore write complete`);
     // Also send a live command to update in-memory balance if player is online
     try {
         await pushCommandToRoblox({
@@ -509,7 +518,8 @@ async function updateBalance(robloxUserId, newBalance) {
             issuedBy: "Blackjack",
             issuedAt: Date.now(),
         });
-    } catch {}
+        console.log(`[BJ] SET_BALANCE command sent`);
+    } catch (e) { console.log(`[BJ] SET_BALANCE command failed:`, e.message); }
     return updated.balance;
 }
 
