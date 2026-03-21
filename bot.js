@@ -228,16 +228,15 @@ client.on("interactionCreate", async (interaction) => {
                 }]
             });
 
+            const timeoutId = setTimeout(() => activeGames.delete(msg.id), 5 * 60 * 1000);
             activeGames.set(msg.id, {
                 deck, playerHand, dealerHand, bet,
                 discordId: interaction.user.id,
                 robloxId: link.robloxUserId,
                 balance,
                 originalBalance: data.balance,
+                timeoutId,
             });
-
-            // Auto-expire game after 5 minutes
-            setTimeout(() => activeGames.delete(msg.id), 5 * 60 * 1000);
 
         } catch (err) { await interaction.editReply(`Error: ${err.message}`); }
         return;
@@ -565,6 +564,7 @@ client.on("interactionCreate", async (interaction) => {
         if (pv > 21) {
             // Bust
             await updateBalance(game.robloxId, game.balance);
+            if (game.timeoutId) clearTimeout(game.timeoutId);
             activeGames.delete(gameId);
             return interaction.editReply({
                 embeds: [bjEmbed(playerHand, dealerHand, game.bet, game.balance, "lose", false)],
@@ -613,6 +613,7 @@ async function resolveDealer(interaction, game, gameId) {
 
     const finalBalance = game.balance + balanceChange;
     await updateBalance(game.robloxId, finalBalance);
+    if (game.timeoutId) clearTimeout(game.timeoutId);
     activeGames.delete(gameId);
 
     await interaction.editReply({
