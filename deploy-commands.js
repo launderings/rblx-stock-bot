@@ -46,6 +46,13 @@ const commands = [
         .setDescription("See live prices and % change for all 19 stocks"),
 
     new SlashCommandBuilder()
+        .setName("giftstock")
+        .setDescription("Gift shares to another linked player")
+        .addUserOption(o => o.setName("player").setDescription("Discord user to gift to").setRequired(true))
+        .addStringOption(o => o.setName("stock").setDescription("Stock to gift").setRequired(true).addChoices(...stockChoices))
+        .addIntegerOption(o => o.setName("amount").setDescription("Number of shares to gift").setRequired(true).setMinValue(1).setMaxValue(10000)),
+
+    new SlashCommandBuilder()
         .setName("blackjack")
         .setDescription("Play blackjack using your in-game balance")
         .addNumberOption(o => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1).setMaxValue(1000000)),
