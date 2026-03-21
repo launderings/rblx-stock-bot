@@ -118,7 +118,7 @@ const commands = [
         .addStringOption(o => o.setName("stock").setDescription("Target stock (blank = all)").addChoices(...stockChoices)),
 
     new SlashCommandBuilder()
-        .setName("resetdata")
+        .setName("datawipe")
         .setDescription("Wipe a player's balance and shares back to default")
         .addStringOption(o => o.setName("username").setDescription("Roblox username (leave blank to reset ALL players)"))
         .addNumberOption(o => o.setName("balance").setDescription("Starting balance to reset to (default 10000)").setMinValue(0)),
