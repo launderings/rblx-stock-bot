@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
+const { Client, GatewayIntentBits, EmbedBuilder, ActivityType } = require("discord.js");
 const express = require("express");
 const fetch   = require("node-fetch");
 const crypto  = require("crypto");
@@ -97,6 +97,10 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 
 client.once("ready", () => {
     console.log(`[Bot] Logged in as ${client.user.tag}`);
+    client.user.setPresence({
+        activities: [{ name: "over Grind The Graph's Blackjack", type: ActivityType.Watching }],
+        status: "online",
+    });
     // Poll for completed link verifications every 5s
     setInterval(pollLinkVerifications, 5000);
 });
