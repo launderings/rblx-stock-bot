@@ -588,7 +588,7 @@ client.on("interactionCreate", async (interaction) => {
             await pushCommandToRoblox({ type: "SET_REGIME", regime, symbol: stockR, issuedBy: interaction.user.tag, issuedAt: Date.now() });
             await interaction.editReply({ embeds: [embed("Regime Set", `Market forced into **${regime}** mode`, regime==="BULL" ? 0x26a69a : regime==="BEAR" ? 0xff4444 : 0x787b86)] });
 
-        } else if (cmd === "resetdata") {
+        } else if (cmd === "datawipe") {
             const username = interaction.options.getString("username") || null;
             const balance  = interaction.options.getNumber("balance") ?? 10000;
             await pushCommandToRoblox({ type: "RESET_DATA", username, balance, issuedBy: interaction.user.tag, issuedAt: Date.now() });
