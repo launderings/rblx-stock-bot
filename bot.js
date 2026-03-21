@@ -348,12 +348,11 @@ client.on("interactionCreate", async (interaction) => {
 
         } else if (cmd === "purge") {
             const amount = interaction.options.getInteger("amount");
-            await interaction.deferReply({ ephemeral: true });
             try {
                 const deleted = await interaction.channel.bulkDelete(amount, true);
-                await interaction.editReply(`🗑️ Deleted **${deleted.size}** message${deleted.size !== 1 ? "s" : ""}.`);
+                await interaction.editReply({ content: `🗑️ Deleted **${deleted.size}** message${deleted.size !== 1 ? "s" : ""}.`, ephemeral: true });
             } catch (err) {
-                await interaction.editReply(`Error: ${err.message}`);
+                await interaction.editReply({ content: `Error: ${err.message}`, ephemeral: true });
             }
         }
 
