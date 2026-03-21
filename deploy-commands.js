@@ -2,9 +2,25 @@ require("dotenv").config();
 const { REST, Routes, SlashCommandBuilder } = require("discord.js");
 
 const stockChoices = [
-    { name: "PLHR - Placeholder Corp", value: "PLHR" },
-    { name: "VLTX - Voltex Industries", value: "VLTX" },
-    { name: "NXCR - Nexcore Systems",   value: "NXCR" },
+    { name: "NRMT - NeuralMint",           value: "NRMT" },
+    { name: "ALGF - AlgoForge",            value: "ALGF" },
+    { name: "QNTG - QuantumGrid",          value: "QNTG" },
+    { name: "BYTV - ByteVest",             value: "BYTV" },
+    { name: "VLTA - Voltara Energy",       value: "VLTA" },
+    { name: "APXF - Apex Fusion",          value: "APXF" },
+    { name: "GRDF - GridFuel",             value: "GRDF" },
+    { name: "HLCR - HelioCore",            value: "HLCR" },
+    { name: "IRCD - IronClad Systems",     value: "IRCD" },
+    { name: "SNTL - Sentinel Dynamics",    value: "SNTL" },
+    { name: "TTWK - TitanWorks",          value: "TTWK" },
+    { name: "AEGM - Aegis Manufacturing",  value: "AEGM" },
+    { name: "CRPT - CrestPoint Capital",   value: "CRPT" },
+    { name: "BLDG - BlueLedger",           value: "BLDG" },
+    { name: "NBMK - NorthBridge Markets",  value: "NBMK" },
+    { name: "PMYD - PrimeYield",           value: "PMYD" },
+    { name: "NXCR - Nexcore Systems",      value: "NXCR" },
+    { name: "VLTX - Voltex Industries",    value: "VLTX" },
+    { name: "PLHR - Placeholder Corp",     value: "PLHR" },
 ];
 
 const commands = [
@@ -22,12 +38,17 @@ const commands = [
         .setDescription("View your full portfolio — balance, shares, and net worth"),
 
     new SlashCommandBuilder()
-        .setName("richlist")
+        .setName("leaderboard")
         .setDescription("See the top 10 wealthiest players"),
 
     new SlashCommandBuilder()
         .setName("blackjack")
         .setDescription("Play blackjack using your in-game balance")
+        .addNumberOption(o => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1).setMaxValue(1000000)),
+
+    new SlashCommandBuilder()
+        .setName("bj")
+        .setDescription("Play blackjack using your in-game balance (shortcut)")
         .addNumberOption(o => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1).setMaxValue(1000000)),
 
     // ── Admin ─────────────────────────────────────────────────
