@@ -93,7 +93,7 @@ async function getRobloxUsername(userId) {
 const pendingLinks = new Map();
 
 // ── Discord bot ───────────────────────────────────────────────
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildVoiceStates] });
 
 client.once("ready", () => {
     console.log(`[Bot] Logged in as ${client.user.tag}`);
@@ -104,6 +104,57 @@ client.once("ready", () => {
 // Prevent unhandled errors from crashing the bot
 process.on("unhandledRejection", (err) => {
     console.error("[Bot] Unhandled rejection:", err.message);
+});
+
+// ================================================================
+// JOIN TO CREATE VC
+// ================================================================
+const JTC_CHANNEL_ID = process.env.JTC_CHANNEL_ID; // Set this in Railway env vars
+const tempChannels = new Map(); // voiceChannelId -> ownerId
+
+client.on("voiceStateUpdate", async (oldState, newState) => {
+    // User joined the JTC channel
+    if (newState.channelId === JTC_CHANNEL_ID && JTC_CHANNEL_ID) {
+        try {
+            const member = newState.member;
+            const guild  = newState.guild;
+            const parent = newState.channel.parentId;
+
+            // Create a new VC named after the user
+            const newChannel = await guild.channels.create({
+                name: `${member.displayName}'s VC`,
+                type: 2, // GUILD_VOICE
+                parent: parent,
+                permissionOverwrites: [
+                    {
+                        id: member.id,
+                        allow: ["ManageChannels", "MoveMembers", "MuteMembers"],
+                    },
+                ],
+            });
+
+            // Move the user into their new channel
+            await member.voice.setChannel(newChannel);
+            tempChannels.set(newChannel.id, member.id);
+            console.log(`[JTC] Created ${newChannel.name} for ${member.displayName}`);
+        } catch (err) {
+            console.error(`[JTC] Error creating channel: ${err.message}`);
+        }
+    }
+
+    // User left a temp channel — delete it if empty
+    if (oldState.channelId && tempChannels.has(oldState.channelId)) {
+        const channel = oldState.guild.channels.cache.get(oldState.channelId);
+        if (channel && channel.members.size === 0) {
+            try {
+                await channel.delete();
+                tempChannels.delete(oldState.channelId);
+                console.log(`[JTC] Deleted empty channel: ${channel.name}`);
+            } catch (err) {
+                console.error(`[JTC] Error deleting channel: ${err.message}`);
+            }
+        }
+    }
 });
 
 // Auto-role new members
