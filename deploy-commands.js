@@ -92,6 +92,11 @@ const commands = [
         .addNumberOption(o => o.setName("price").setDescription("New price in dollars").setRequired(true).setMinValue(0.01).setMaxValue(999999))
         .addStringOption(o => o.setName("stock").setDescription("Target stock (blank = PLHR)").addChoices(...stockChoices)),
 
+    new SlashCommandBuilder()
+        .setName("purge")
+        .setDescription("Delete messages from this channel (admin only)")
+        .addIntegerOption(o => o.setName("amount").setDescription("Number of messages to delete (1-100)").setRequired(true).setMinValue(1).setMaxValue(100)),
+
 ].map(c => c.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
