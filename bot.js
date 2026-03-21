@@ -241,73 +241,6 @@ client.on("interactionCreate", async (interaction) => {
     const cmd = interaction.commandName;
 
     // ── Economy commands (no admin required) ─────────────────
-    if (cmd === "giftstock") {
-        await interaction.deferReply({ ephemeral: true });
-        try {
-            const link = await getLinkedRobloxId(interaction.user.id);
-            if (!link) return interaction.editReply({ embeds: [embed("Not Linked", "Link your account first with `/link`.", 0xff4444)] });
-
-            const targetUser = interaction.options.getUser("player");
-            const symbol     = interaction.options.getString("stock");
-            const qty        = interaction.options.getInteger("amount");
-
-            // Get recipient's linked account
-            const targetLink = await getLinkedRobloxId(targetUser.id);
-            if (!targetLink) return interaction.editReply({ embeds: [embed("Not Linked", `${targetUser.username} hasn't linked their account yet.`, 0xff4444)] });
-            if (targetLink.robloxUserId === link.robloxUserId) return interaction.editReply({ embeds: [embed("Invalid", "You can't gift stocks to yourself.", 0xff4444)] });
-
-            // Get sender data
-            const senderData = await getPlayerData(link.robloxUserId);
-            if (!senderData) return interaction.editReply({ embeds: [embed("No Data", "Your game data not found.", 0xff4444)] });
-
-            const shares = senderData.shares || {};
-            const owned  = shares[symbol] || 0;
-            if (owned < qty) return interaction.editReply({ embeds: [embed("Insufficient Shares", `You only own **${owned}** ${symbol} shares.`, 0xff4444)] });
-
-            // Get recipient data
-            const recipientData = await getPlayerData(targetLink.robloxUserId);
-            if (!recipientData) return interaction.editReply({ embeds: [embed("No Data", `${targetUser.username}'s game data not found.`, 0xff4444)] });
-
-            // Transfer shares
-            senderData.shares[symbol]    = owned - qty;
-            recipientData.shares         = recipientData.shares || {};
-            recipientData.shares[symbol] = (recipientData.shares[symbol] || 0) + qty;
-
-            // Save both
-            await dsRequest("SET", "StockGame_v1", String(link.robloxUserId), senderData);
-            await dsRequest("SET", "StockGame_v1", String(targetLink.robloxUserId), recipientData);
-
-            // Notify in-game via SET_BALANCE to force sync
-            try {
-                await pushCommandToRoblox({ type: "SET_BALANCE", robloxUserId: link.robloxUserId, balance: senderData.balance, issuedBy: "GiftStock", issuedAt: Date.now() });
-                await pushCommandToRoblox({ type: "SET_BALANCE", robloxUserId: targetLink.robloxUserId, balance: recipientData.balance, issuedBy: "GiftStock", issuedAt: Date.now() });
-            } catch {}
-
-            await interaction.editReply({
-                embeds: [new EmbedBuilder()
-                    .setTitle("🎁 Shares Gifted!")
-                    .setDescription(`You sent **${qty} ${symbol}** shares to **${targetUser.username}** (${targetLink.robloxUsername})`)
-                    .addFields(
-                        { name: "Your remaining shares", value: String(senderData.shares[symbol]), inline: true },
-                        { name: "Their new total", value: String(recipientData.shares[symbol]), inline: true },
-                    )
-                    .setColor(0xf5a623)
-                    .setTimestamp()
-                    .setFooter({ text: "RBLX Stock Market" })]
-            });
-
-            // DM the recipient
-            try {
-                await targetUser.send({ embeds: [new EmbedBuilder()
-                    .setTitle("🎁 You received shares!")
-                    .setDescription(`**${interaction.user.username}** gifted you **${qty} ${symbol}** shares!`)
-                    .setColor(0xf5a623).setTimestamp()] });
-            } catch {}
-
-        } catch (err) { await interaction.editReply(`Error: ${err.message}`); }
-        return;
-    }
-
     if (cmd === "blackjack" || cmd === "bj") {
         await interaction.deferReply();
         try {
@@ -587,6 +520,32 @@ client.on("interactionCreate", async (interaction) => {
             const stockR = interaction.options.getString("stock") || null;
             await pushCommandToRoblox({ type: "SET_REGIME", regime, symbol: stockR, issuedBy: interaction.user.tag, issuedAt: Date.now() });
             await interaction.editReply({ embeds: [embed("Regime Set", `Market forced into **${regime}** mode`, regime==="BULL" ? 0x26a69a : regime==="BEAR" ? 0xff4444 : 0x787b86)] });
+
+        } else if (cmd === "giftstock") {
+            const targetUser = interaction.options.getUser("player");
+            const symbol     = interaction.options.getString("stock");
+            const qty        = interaction.options.getInteger("amount");
+
+            const targetLink = await getLinkedRobloxId(targetUser.id);
+            if (!targetLink) {
+                await interaction.editReply({ embeds: [embed("Not Linked", `${targetUser.username} hasn't linked their account yet.`, 0xff4444)] });
+            } else {
+                const recipientData = await getPlayerData(targetLink.robloxUserId);
+                if (!recipientData) {
+                    await interaction.editReply({ embeds: [embed("No Data", `${targetUser.username}'s game data not found.`, 0xff4444)] });
+                } else {
+                    recipientData.shares = recipientData.shares || {};
+                    recipientData.shares[symbol] = (recipientData.shares[symbol] || 0) + qty;
+                    await dsRequest("SET", "StockGame_v1", String(targetLink.robloxUserId), recipientData);
+                    try {
+                        await pushCommandToRoblox({ type: "SET_BALANCE", robloxUserId: targetLink.robloxUserId, balance: recipientData.balance, issuedBy: "GiftStock", issuedAt: Date.now() });
+                    } catch {}
+                    await interaction.editReply({ embeds: [embed("🎁 Shares Gifted!", `Gave **${qty} ${symbol}** to **${targetUser.username}** (${targetLink.robloxUsername})`, 0xf5a623)] });
+                    try {
+                        await targetUser.send({ embeds: [new EmbedBuilder().setTitle("🎁 You received shares!").setDescription(`An admin gifted you **${qty} ${symbol}** shares!`).setColor(0xf5a623).setTimestamp()] });
+                    } catch {}
+                }
+            }
 
         } else if (cmd === "datawipe") {
             const username = interaction.options.getString("username") || null;
