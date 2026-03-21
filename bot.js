@@ -74,7 +74,7 @@ async function getRobloxUsername(userId) {
 const pendingLinks = new Map();
 
 // ── Discord bot ───────────────────────────────────────────────
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
 client.once("ready", () => {
     console.log(`[Bot] Logged in as ${client.user.tag}`);
@@ -350,6 +350,30 @@ client.on("interactionCreate", async (interaction) => {
     } catch (err) {
         console.error("[Bot] Error:", err.message);
         await interaction.editReply(`Error: ${err.message}`);
+    }
+});
+
+// Purge command (prefix-based, not slash — avoids needing message content intent issues)
+client.on("messageCreate", async (message) => {
+    if (message.author.bot) return;
+    if (ALLOWED_GUILD_ID && message.guildId !== ALLOWED_GUILD_ID) return;
+    if (!message.content.startsWith("!purge")) return;
+    // Check admin role
+    if (ADMIN_ROLE_ID && !message.member.roles.cache.has(ADMIN_ROLE_ID)) {
+        return message.reply("You don't have permission to use this command.");
+    }
+    const args = message.content.split(" ");
+    const amount = parseInt(args[1]);
+    if (!amount || amount < 1 || amount > 100) {
+        return message.reply("Usage: `!purge <1-100>`");
+    }
+    try {
+        await message.delete();
+        const deleted = await message.channel.bulkDelete(amount, true);
+        const confirm = await message.channel.send(`🗑️ Deleted **${deleted.size}** message${deleted.size !== 1 ? "s" : ""}.`);
+        setTimeout(() => confirm.delete().catch(() => {}), 3000);
+    } catch (err) {
+        message.channel.send(`Error: ${err.message}`).then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
     }
 });
 
