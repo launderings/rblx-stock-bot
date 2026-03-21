@@ -42,6 +42,10 @@ const commands = [
         .setDescription("See the top 10 wealthiest players"),
 
     new SlashCommandBuilder()
+        .setName("marketstatus")
+        .setDescription("See live prices and % change for all 19 stocks"),
+
+    new SlashCommandBuilder()
         .setName("blackjack")
         .setDescription("Play blackjack using your in-game balance")
         .addNumberOption(o => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1).setMaxValue(1000000)),
@@ -117,6 +121,11 @@ const commands = [
         .setDescription("Set the market price to a specific value")
         .addNumberOption(o => o.setName("price").setDescription("New price in dollars").setRequired(true).setMinValue(0.01).setMaxValue(999999))
         .addStringOption(o => o.setName("stock").setDescription("Target stock (blank = PLHR)").addChoices(...stockChoices)),
+
+    new SlashCommandBuilder()
+        .setName("shutdown")
+        .setDescription("Gracefully shut down all game servers")
+        .addStringOption(o => o.setName("reason").setDescription("Reason shown to players")),
 
     new SlashCommandBuilder()
         .setName("purge")
