@@ -276,6 +276,51 @@ client.on("interactionCreate", async (interaction) => {
         return;
     }
 
+    if (cmd === "marketstatus") {
+        await interaction.deferReply();
+        try {
+            // Read latest candle data from DataStore
+            const data = await dsRequest("GET", "StockMarket_v6", "MarketStateV2");
+            if (!data || !data.markets) {
+                return interaction.editReply({ embeds: [embed("Market Status", "No market data available yet.", 0x787b86)] });
+            }
+            const sectors = {
+                "Tech / Quant":        ["NRMT","ALGF","QNTG","BYTV"],
+                "Energy":              ["VLTA","APXF","GRDF","HLCR"],
+                "Defense / Industrial":["IRCD","SNTL","TTWK","AEGM"],
+                "Finance":             ["CRPT","BLDG","NBMK","PMYD"],
+                "Legacy":              ["NXCR","VLTX","PLHR"],
+            };
+            const fields = [];
+            for (const [sector, symbols] of Object.entries(sectors)) {
+                let lines = "";
+                for (const sym of symbols) {
+                    const market = data.markets[sym];
+                    if (!market || !market.candles || market.candles.length === 0) continue;
+                    const candles = market.candles;
+                    const last  = candles[candles.length - 1];
+                    const first = candles[0];
+                    const chg   = last.close - first.open;
+                    const chgPct = ((chg / first.open) * 100).toFixed(2);
+                    const arrow = chg >= 0 ? "🟢" : "🔴";
+                    const sign  = chg >= 0 ? "+" : "";
+                    lines += `${arrow} **${sym}** $${last.close.toFixed(2)}  ${sign}${chgPct}%
+`;
+                }
+                if (lines) fields.push({ name: sector, value: lines, inline: false });
+            }
+            await interaction.editReply({
+                embeds: [new EmbedBuilder()
+                    .setTitle("📊 Market Status — All 19 Stocks")
+                    .addFields(...fields)
+                    .setColor(0x2962ff)
+                    .setTimestamp()
+                    .setFooter({ text: "RBLX Stock Market" })]
+            });
+        } catch (err) { await interaction.editReply(`Error: ${err.message}`); }
+        return;
+    }
+
     if (cmd === "balance") {
         await interaction.deferReply();
         try {
@@ -437,6 +482,12 @@ client.on("interactionCreate", async (interaction) => {
             const stockP = interaction.options.getString("stock") || null;
             await pushCommandToRoblox({ type: "SET_PRICE", price, symbol: stockP, issuedBy: interaction.user.tag, issuedAt: Date.now() });
             await interaction.editReply({ embeds: [embed("Price Set", `Market price set to **$${price.toLocaleString()}**`, 0xf5a623)] });
+
+        } else if (cmd === "shutdown") {
+            const reason = interaction.options.getString("reason") ?? "Server shutdown requested by admin.";
+            await pushCommandToRoblox({ type: "SHUTDOWN", reason, issuedBy: interaction.user.tag, issuedAt: Date.now() });
+            await interaction.editReply({ embeds: [embed("Shutdown Sent", `All servers will shut down.
+**Reason:** ${reason}`, 0xff4444)] });
 
         } else if (cmd === "purge") {
             const amount = interaction.options.getInteger("amount");
