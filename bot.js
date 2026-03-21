@@ -26,10 +26,29 @@ async function dsRequest(method, dsName, entryKey, body) {
         });
         if (res.status === 404) return null;
         if (!res.ok) throw new Error(`Roblox GET error ${res.status}: ${await res.text()}`);
-        const data = await res.json();
-        try { return JSON.parse(data.value); } catch { return data.value; }
+        const text = await res.text();
+        // v2 API returns JSON with a "value" field containing the stored string
+        try {
+            const outer = JSON.parse(text);
+            // value field contains the actual data as a JSON string
+            if (outer.value !== undefined) {
+                try { return JSON.parse(outer.value); } catch { return outer.value; }
+            }
+            return outer;
+        } catch {
+            return text;
+        }
     }
 
+    if (method === "DEL") {
+        const res = await fetch(`${base}/${key}`, {
+            method: "DELETE",
+            headers: { "x-api-key": ROBLOX_OPEN_CLOUD_KEY },
+        });
+        return res.ok;
+    }
+
+    // PATCH/POST — wrap value as JSON string
     const payload = JSON.stringify({ value: JSON.stringify(body) });
     let res = await fetch(`${base}/${key}`, {
         method: "PATCH",
