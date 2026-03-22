@@ -836,6 +836,7 @@ async function updateBalance(robloxUserId, newBalance) {
 // Handle blackjack button interactions
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
+    if (!interaction.customId.startsWith("bj_")) return; // ignore non-blackjack buttons
     const gameId = interaction.message.id;
     const game   = activeGames.get(gameId);
     if (!game) return interaction.reply({ content: "This game has expired.", ephemeral: true });
