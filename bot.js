@@ -95,10 +95,13 @@ const pendingLinks = new Map();
 // ── Discord bot ───────────────────────────────────────────────
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildVoiceStates] });
 
-client.once("ready", () => {
+client.once("ready", async () => {
     console.log(`[Bot] Logged in as ${client.user.tag}`);
-    // Poll for completed link verifications every 5s
     setInterval(pollLinkVerifications, 5000);
+    // Post persistent VC panel in all guilds
+    for (const guild of client.guilds.cache.values()) {
+        await ensurePersistentPanel(guild).catch(console.error);
+    }
 });
 
 // Prevent unhandled errors from crashing the bot
@@ -107,16 +110,18 @@ process.on("unhandledRejection", (err) => {
 });
 
 // ================================================================
-// JOIN TO CREATE VC — VoiceMaster Interface
+// JOIN TO CREATE VC — Persistent VoiceMaster Panel
 // ================================================================
-const JTC_CHANNEL_ID = process.env.JTC_CHANNEL_ID;
-const JTC_TEXT_CHANNEL_ID = process.env.JTC_TEXT_CHANNEL_ID; // channel to send control panel
-const tempChannels = new Map(); // voiceChannelId -> { ownerId, controlMsgId, textChannelId }
+const JTC_CHANNEL_ID      = process.env.JTC_CHANNEL_ID;
+const JTC_TEXT_CHANNEL_ID = process.env.JTC_TEXT_CHANNEL_ID;
+const tempChannels = new Map(); // voiceChannelId -> { ownerId }
+let persistentPanelMsgId  = null; // ID of the single persistent control panel message
 
-function buildVCPanel(channel) {
+// Persistent panel — buttons always use fixed IDs, action resolves VC from user's current channel
+function buildVCPanel() {
     const embed = new EmbedBuilder()
         .setAuthor({ name: "VoiceMaster Interface" })
-        .setDescription("Click the buttons below to control your voice channel")
+        .setDescription("Click the buttons below to control **your** voice channel")
         .addFields({ name: "Button Usage", value: [
             "🔒 — **Lock** the voice channel",
             "🔓 — **Unlock** the voice channel",
@@ -133,24 +138,44 @@ function buildVCPanel(channel) {
 
     const row1 = {
         type: 1, components: [
-            { type: 2, style: 2, emoji: "🔒", custom_id: `vc_lock_${channel.id}` },
-            { type: 2, style: 2, emoji: "🔓", custom_id: `vc_unlock_${channel.id}` },
-            { type: 2, style: 2, emoji: "👻", custom_id: `vc_ghost_${channel.id}` },
-            { type: 2, style: 2, emoji: "👁️", custom_id: `vc_reveal_${channel.id}` },
-            { type: 2, style: 2, emoji: "🎙️", custom_id: `vc_claim_${channel.id}` },
+            { type: 2, style: 2, emoji: "🔒", custom_id: "vc_lock" },
+            { type: 2, style: 2, emoji: "🔓", custom_id: "vc_unlock" },
+            { type: 2, style: 2, emoji: "👻", custom_id: "vc_ghost" },
+            { type: 2, style: 2, emoji: "👁️", custom_id: "vc_reveal" },
+            { type: 2, style: 2, emoji: "🎙️", custom_id: "vc_claim" },
         ]
     };
     const row2 = {
         type: 1, components: [
-            { type: 2, style: 2, emoji: "🔨", custom_id: `vc_kick_${channel.id}` },
-            { type: 2, style: 2, emoji: "🎮", custom_id: `vc_activity_${channel.id}` },
-            { type: 2, style: 2, emoji: "📋", custom_id: `vc_info_${channel.id}` },
-            { type: 2, style: 2, emoji: "➕", custom_id: `vc_increase_${channel.id}` },
-            { type: 2, style: 2, emoji: "➖", custom_id: `vc_decrease_${channel.id}` },
+            { type: 2, style: 2, emoji: "🔨", custom_id: "vc_kick" },
+            { type: 2, style: 2, emoji: "🎮", custom_id: "vc_activity" },
+            { type: 2, style: 2, emoji: "📋", custom_id: "vc_info" },
+            { type: 2, style: 2, emoji: "➕", custom_id: "vc_increase" },
+            { type: 2, style: 2, emoji: "➖", custom_id: "vc_decrease" },
         ]
     };
 
     return { embeds: [embed], components: [row1, row2] };
+}
+
+// Post or restore the persistent panel on bot ready
+async function ensurePersistentPanel(guild) {
+    if (!JTC_TEXT_CHANNEL_ID) return;
+    const textChannel = guild.channels.cache.get(JTC_TEXT_CHANNEL_ID);
+    if (!textChannel) return;
+
+    // Check if panel already exists in last 50 messages
+    const messages = await textChannel.messages.fetch({ limit: 50 });
+    const existing = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].author?.name === "VoiceMaster Interface");
+
+    if (existing) {
+        persistentPanelMsgId = existing.id;
+        console.log("[JTC] Found existing persistent panel");
+    } else {
+        const msg = await textChannel.send(buildVCPanel());
+        persistentPanelMsgId = msg.id;
+        console.log("[JTC] Posted new persistent panel");
+    }
 }
 
 client.on("voiceStateUpdate", async (oldState, newState) => {
@@ -172,33 +197,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
             });
 
             await member.voice.setChannel(newChannel);
-
-            // Send control panel to JTC text channel or same category text channel
-            let textChannel = JTC_TEXT_CHANNEL_ID
-                ? guild.channels.cache.get(JTC_TEXT_CHANNEL_ID)
-                : null;
-
-            // Fallback: find a text channel in same category
-            if (!textChannel && parent) {
-                textChannel = guild.channels.cache.find(c =>
-                    c.parentId === parent && c.type === 0
-                );
-            }
-
-            let controlMsgId = null;
-            if (textChannel) {
-                const msg = await textChannel.send({
-                    content: `${member} your voice channel is ready!`,
-                    ...buildVCPanel(newChannel)
-                });
-                controlMsgId = msg.id;
-            }
-
-            tempChannels.set(newChannel.id, {
-                ownerId: member.id,
-                controlMsgId,
-                textChannelId: textChannel?.id,
-            });
+            tempChannels.set(newChannel.id, { ownerId: member.id });
             console.log(`[JTC] Created ${newChannel.name} for ${member.displayName}`);
         } catch (err) {
             console.error(`[JTC] Error creating channel: ${err.message}`);
@@ -210,15 +209,6 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
         const channel = oldState.guild.channels.cache.get(oldState.channelId);
         if (channel && channel.members.size === 0) {
             try {
-                const data = tempChannels.get(oldState.channelId);
-                // Delete control panel message
-                if (data.controlMsgId && data.textChannelId) {
-                    const tc = oldState.guild.channels.cache.get(data.textChannelId);
-                    if (tc) {
-                        const msg = await tc.messages.fetch(data.controlMsgId).catch(() => null);
-                        if (msg) await msg.delete().catch(() => {});
-                    }
-                }
                 await channel.delete();
                 tempChannels.delete(oldState.channelId);
                 console.log(`[JTC] Deleted empty channel: ${channel.name}`);
@@ -232,17 +222,21 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
 // Handle VC control button interactions
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
-    const [prefix, action, channelId] = interaction.customId.split("_");
+    const [prefix, action] = interaction.customId.split("_");
     if (prefix !== "vc") return;
 
-    const guild   = interaction.guild;
-    const member  = interaction.member;
-    const channel = guild.channels.cache.get(channelId);
-    const data    = tempChannels.get(channelId);
+    const guild  = interaction.guild;
+    const member = interaction.member;
 
-    if (!channel) return interaction.reply({ content: "This voice channel no longer exists.", ephemeral: true });
+    // Resolve the user's current voice channel
+    const voiceState = member.voice;
+    const channel    = voiceState?.channel;
+    const channelId  = channel?.id;
+    const data       = channelId ? tempChannels.get(channelId) : null;
 
-    const isOwner = data && data.ownerId === member.id;
+    if (!channel || !data) return interaction.reply({ content: "You need to be in a voice channel created by the bot.", ephemeral: true });
+
+    const isOwner = data.ownerId === member.id;
     const isAdmin = ADMIN_ROLE_ID && member.roles.cache.has(ADMIN_ROLE_ID);
 
     if (action === "info") {
@@ -291,13 +285,12 @@ client.on("interactionCreate", async (interaction) => {
             await channel.setUserLimit(newLimit);
             interaction.reply({ ephemeral: true, content: `➖ User limit set to **${newLimit === 0 ? "unlimited" : newLimit}**.` });
         } else if (action === "kick") {
-            // Show select menu of members to disconnect
             const vcMembers = channel.members.filter(m => m.id !== member.id);
             if (vcMembers.size === 0) return interaction.reply({ ephemeral: true, content: "No other members in the channel." });
             const options = vcMembers.map(m => ({ label: m.displayName, value: m.id })).slice(0, 25);
             await interaction.reply({ ephemeral: true, components: [{
                 type: 1, components: [{
-                    type: 3, custom_id: `vc_kickselect_${channelId}`,
+                    type: 3, custom_id: "vc_kickselect",
                     placeholder: "Select a member to disconnect",
                     options
                 }]
@@ -313,12 +306,13 @@ client.on("interactionCreate", async (interaction) => {
 // Handle kick select menu
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isStringSelectMenu()) return;
-    const [prefix, action, channelId] = interaction.customId.split("_");
+    const [prefix, action] = interaction.customId.split("_");
     if (prefix !== "vc" || action !== "kickselect") return;
 
     const guild   = interaction.guild;
-    const channel = guild.channels.cache.get(channelId);
-    if (!channel) return interaction.reply({ content: "Channel not found.", ephemeral: true });
+    const member2 = interaction.member;
+    const channel = member2.voice?.channel;
+    if (!channel) return interaction.reply({ content: "You are not in a voice channel.", ephemeral: true });
 
     const targetId = interaction.values[0];
     const target   = guild.members.cache.get(targetId);
