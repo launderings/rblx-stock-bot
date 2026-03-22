@@ -107,10 +107,60 @@ process.on("unhandledRejection", (err) => {
 });
 
 // ================================================================
-// JOIN TO CREATE VC
+// JOIN TO CREATE VC — VoiceMaster Interface
 // ================================================================
-const JTC_CHANNEL_ID = process.env.JTC_CHANNEL_ID; // Set this in Railway env vars
-const tempChannels = new Map(); // voiceChannelId -> ownerId
+const JTC_CHANNEL_ID = process.env.JTC_CHANNEL_ID;
+const JTC_TEXT_CHANNEL_ID = process.env.JTC_TEXT_CHANNEL_ID; // channel to send control panel
+const tempChannels = new Map(); // voiceChannelId -> { ownerId, controlMsgId, textChannelId }
+
+function buildVCPanel(channel) {
+    const embed = new EmbedBuilder()
+        .setAuthor({ name: "VoiceMaster Interface" })
+        .setDescription("Click the buttons below to control your voice channel")
+        .addFields({ name: "Button Usage", value:
+            "🔒 — **Lock** the voice channel
+" +
+            "🔓 — **Unlock** the voice channel
+" +
+            "👻 — **Ghost** the voice channel
+" +
+            "👁️ — **Reveal** the voice channel
+" +
+            "🎙️ — **Claim** the voice channel
+" +
+            "🔨 — **Disconnect** a member
+" +
+            "🎮 — **Start** an activity
+" +
+            "📋 — **View** channel information
+" +
+            "➕ — **Increase** the user limit
+" +
+            "➖ — **Decrease** the user limit"
+        })
+        .setColor(0x5865f2);
+
+    const row1 = {
+        type: 1, components: [
+            { type: 2, style: 2, emoji: "🔒", custom_id: `vc_lock_${channel.id}` },
+            { type: 2, style: 2, emoji: "🔓", custom_id: `vc_unlock_${channel.id}` },
+            { type: 2, style: 2, emoji: "👻", custom_id: `vc_ghost_${channel.id}` },
+            { type: 2, style: 2, emoji: "👁️", custom_id: `vc_reveal_${channel.id}` },
+            { type: 2, style: 2, emoji: "🎙️", custom_id: `vc_claim_${channel.id}` },
+        ]
+    };
+    const row2 = {
+        type: 1, components: [
+            { type: 2, style: 2, emoji: "🔨", custom_id: `vc_kick_${channel.id}` },
+            { type: 2, style: 2, emoji: "🎮", custom_id: `vc_activity_${channel.id}` },
+            { type: 2, style: 2, emoji: "📋", custom_id: `vc_info_${channel.id}` },
+            { type: 2, style: 2, emoji: "➕", custom_id: `vc_increase_${channel.id}` },
+            { type: 2, style: 2, emoji: "➖", custom_id: `vc_decrease_${channel.id}` },
+        ]
+    };
+
+    return { embeds: [embed], components: [row1, row2] };
+}
 
 client.on("voiceStateUpdate", async (oldState, newState) => {
     // User joined the JTC channel
@@ -120,22 +170,44 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
             const guild  = newState.guild;
             const parent = newState.channel.parentId;
 
-            // Create a new VC named after the user
             const newChannel = await guild.channels.create({
                 name: `${member.displayName}'s VC`,
-                type: 2, // GUILD_VOICE
+                type: 2,
                 parent: parent,
                 permissionOverwrites: [
-                    {
-                        id: member.id,
-                        allow: ["ManageChannels", "MoveMembers", "MuteMembers"],
-                    },
+                    { id: guild.id, deny: [] },
+                    { id: member.id, allow: ["ManageChannels", "MoveMembers", "MuteMembers", "DeafenMembers"] },
                 ],
             });
 
-            // Move the user into their new channel
             await member.voice.setChannel(newChannel);
-            tempChannels.set(newChannel.id, member.id);
+
+            // Send control panel to JTC text channel or same category text channel
+            let textChannel = JTC_TEXT_CHANNEL_ID
+                ? guild.channels.cache.get(JTC_TEXT_CHANNEL_ID)
+                : null;
+
+            // Fallback: find a text channel in same category
+            if (!textChannel && parent) {
+                textChannel = guild.channels.cache.find(c =>
+                    c.parentId === parent && c.type === 0
+                );
+            }
+
+            let controlMsgId = null;
+            if (textChannel) {
+                const msg = await textChannel.send({
+                    content: `${member} your voice channel is ready!`,
+                    ...buildVCPanel(newChannel)
+                });
+                controlMsgId = msg.id;
+            }
+
+            tempChannels.set(newChannel.id, {
+                ownerId: member.id,
+                controlMsgId,
+                textChannelId: textChannel?.id,
+            });
             console.log(`[JTC] Created ${newChannel.name} for ${member.displayName}`);
         } catch (err) {
             console.error(`[JTC] Error creating channel: ${err.message}`);
@@ -147,6 +219,15 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
         const channel = oldState.guild.channels.cache.get(oldState.channelId);
         if (channel && channel.members.size === 0) {
             try {
+                const data = tempChannels.get(oldState.channelId);
+                // Delete control panel message
+                if (data.controlMsgId && data.textChannelId) {
+                    const tc = oldState.guild.channels.cache.get(data.textChannelId);
+                    if (tc) {
+                        const msg = await tc.messages.fetch(data.controlMsgId).catch(() => null);
+                        if (msg) await msg.delete().catch(() => {});
+                    }
+                }
                 await channel.delete();
                 tempChannels.delete(oldState.channelId);
                 console.log(`[JTC] Deleted empty channel: ${channel.name}`);
@@ -154,6 +235,107 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
                 console.error(`[JTC] Error deleting channel: ${err.message}`);
             }
         }
+    }
+});
+
+// Handle VC control button interactions
+client.on("interactionCreate", async (interaction) => {
+    if (!interaction.isButton()) return;
+    const [prefix, action, channelId] = interaction.customId.split("_");
+    if (prefix !== "vc") return;
+
+    const guild   = interaction.guild;
+    const member  = interaction.member;
+    const channel = guild.channels.cache.get(channelId);
+    const data    = tempChannels.get(channelId);
+
+    if (!channel) return interaction.reply({ content: "This voice channel no longer exists.", ephemeral: true });
+
+    const isOwner = data && data.ownerId === member.id;
+    const isAdmin = ADMIN_ROLE_ID && member.roles.cache.has(ADMIN_ROLE_ID);
+
+    if (action === "info") {
+        const members = channel.members.map(m => m.displayName).join(", ") || "Empty";
+        return interaction.reply({ ephemeral: true, embeds: [new EmbedBuilder()
+            .setTitle(`📋 ${channel.name}`)
+            .addFields(
+                { name: "Owner", value: data ? `<@${data.ownerId}>` : "Unknown", inline: true },
+                { name: "Members", value: members, inline: true },
+                { name: "User Limit", value: channel.userLimit === 0 ? "Unlimited" : String(channel.userLimit), inline: true },
+            ).setColor(0x5865f2)] });
+    }
+
+    if (action === "claim") {
+        if (data && guild.members.cache.get(data.ownerId)?.voice?.channelId !== channelId) {
+            tempChannels.set(channelId, { ...data, ownerId: member.id });
+            await channel.permissionOverwrites.edit(member.id, { ManageChannels: true, MoveMembers: true });
+            return interaction.reply({ ephemeral: true, content: "✅ You've claimed this voice channel!" });
+        }
+        return interaction.reply({ ephemeral: true, content: "The owner is still in the channel." });
+    }
+
+    if (!isOwner && !isAdmin) {
+        return interaction.reply({ ephemeral: true, content: "Only the channel owner can use these controls." });
+    }
+
+    try {
+        if (action === "lock") {
+            await channel.permissionOverwrites.edit(guild.id, { Connect: false });
+            interaction.reply({ ephemeral: true, content: "🔒 Channel locked." });
+        } else if (action === "unlock") {
+            await channel.permissionOverwrites.edit(guild.id, { Connect: true });
+            interaction.reply({ ephemeral: true, content: "🔓 Channel unlocked." });
+        } else if (action === "ghost") {
+            await channel.permissionOverwrites.edit(guild.id, { ViewChannel: false });
+            interaction.reply({ ephemeral: true, content: "👻 Channel hidden." });
+        } else if (action === "reveal") {
+            await channel.permissionOverwrites.edit(guild.id, { ViewChannel: true });
+            interaction.reply({ ephemeral: true, content: "👁️ Channel revealed." });
+        } else if (action === "increase") {
+            const newLimit = Math.min((channel.userLimit || 0) + 1, 99);
+            await channel.setUserLimit(newLimit);
+            interaction.reply({ ephemeral: true, content: `➕ User limit set to **${newLimit}**.` });
+        } else if (action === "decrease") {
+            const newLimit = Math.max((channel.userLimit || 1) - 1, 0);
+            await channel.setUserLimit(newLimit);
+            interaction.reply({ ephemeral: true, content: `➖ User limit set to **${newLimit === 0 ? "unlimited" : newLimit}**.` });
+        } else if (action === "kick") {
+            // Show select menu of members to disconnect
+            const vcMembers = channel.members.filter(m => m.id !== member.id);
+            if (vcMembers.size === 0) return interaction.reply({ ephemeral: true, content: "No other members in the channel." });
+            const options = vcMembers.map(m => ({ label: m.displayName, value: m.id })).slice(0, 25);
+            await interaction.reply({ ephemeral: true, components: [{
+                type: 1, components: [{
+                    type: 3, custom_id: `vc_kickselect_${channelId}`,
+                    placeholder: "Select a member to disconnect",
+                    options
+                }]
+            }]});
+        } else if (action === "activity") {
+            interaction.reply({ ephemeral: true, content: "🎮 To start an activity, right-click the voice channel → Activities." });
+        }
+    } catch (err) {
+        interaction.reply({ ephemeral: true, content: `Error: ${err.message}` }).catch(() => {});
+    }
+});
+
+// Handle kick select menu
+client.on("interactionCreate", async (interaction) => {
+    if (!interaction.isStringSelectMenu()) return;
+    const [prefix, action, channelId] = interaction.customId.split("_");
+    if (prefix !== "vc" || action !== "kickselect") return;
+
+    const guild   = interaction.guild;
+    const channel = guild.channels.cache.get(channelId);
+    if (!channel) return interaction.reply({ content: "Channel not found.", ephemeral: true });
+
+    const targetId = interaction.values[0];
+    const target   = guild.members.cache.get(targetId);
+    if (target?.voice?.channelId === channelId) {
+        await target.voice.disconnect();
+        interaction.reply({ ephemeral: true, content: `🔨 Disconnected **${target.displayName}**.` });
+    } else {
+        interaction.reply({ ephemeral: true, content: "That member is no longer in the channel." });
     }
 });
 
