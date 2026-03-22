@@ -117,27 +117,18 @@ function buildVCPanel(channel) {
     const embed = new EmbedBuilder()
         .setAuthor({ name: "VoiceMaster Interface" })
         .setDescription("Click the buttons below to control your voice channel")
-        .addFields({ name: "Button Usage", value:
-            "🔒 — **Lock** the voice channel
-" +
-            "🔓 — **Unlock** the voice channel
-" +
-            "👻 — **Ghost** the voice channel
-" +
-            "👁️ — **Reveal** the voice channel
-" +
-            "🎙️ — **Claim** the voice channel
-" +
-            "🔨 — **Disconnect** a member
-" +
-            "🎮 — **Start** an activity
-" +
-            "📋 — **View** channel information
-" +
-            "➕ — **Increase** the user limit
-" +
-            "➖ — **Decrease** the user limit"
-        })
+        .addFields({ name: "Button Usage", value: [
+            "🔒 — **Lock** the voice channel",
+            "🔓 — **Unlock** the voice channel",
+            "👻 — **Ghost** the voice channel",
+            "👁️ — **Reveal** the voice channel",
+            "🎙️ — **Claim** the voice channel",
+            "🔨 — **Disconnect** a member",
+            "🎮 — **Start** an activity",
+            "📋 — **View** channel information",
+            "➕ — **Increase** the user limit",
+            "➖ — **Decrease** the user limit",
+        ].join("\n") })
         .setColor(0x5865f2);
 
     const row1 = {
