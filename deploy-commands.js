@@ -46,6 +46,16 @@ const commands = [
         .setDescription("See live prices and % change for all 19 stocks"),
 
     new SlashCommandBuilder()
+        .setName("whitelist")
+        .setDescription("Allow a member to join your locked voice channel")
+        .addUserOption(o => o.setName("member").setDescription("Member to whitelist").setRequired(true)),
+
+    new SlashCommandBuilder()
+        .setName("unwhitelist")
+        .setDescription("Remove a member from your voice channel whitelist")
+        .addUserOption(o => o.setName("member").setDescription("Member to unwhitelist").setRequired(true)),
+
+    new SlashCommandBuilder()
         .setName("blackjack")
         .setDescription("Play blackjack using your in-game balance")
         .addNumberOption(o => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1).setMaxValue(1000000)),
