@@ -133,6 +133,8 @@ function buildVCPanel() {
             "📋 — **View** channel information",
             "➕ — **Increase** the user limit",
             "➖ — **Decrease** the user limit",
+            "✅ — **Whitelist** a member to join",
+            "❌ — **Unwhitelist** a member",
         ].join("\n") })
         .setColor(0x5865f2);
 
@@ -154,8 +156,14 @@ function buildVCPanel() {
             { type: 2, style: 2, emoji: "➖", custom_id: "vc_decrease" },
         ]
     };
+    const row3 = {
+        type: 1, components: [
+            { type: 2, style: 1, emoji: "✅", label: "Whitelist", custom_id: "vc_whitelist" },
+            { type: 2, style: 4, emoji: "❌", label: "Unwhitelist", custom_id: "vc_unwhitelist" },
+        ]
+    };
 
-    return { embeds: [embed], components: [row1, row2] };
+    return { embeds: [embed], components: [row1, row2, row3] };
 }
 
 // Post or restore the persistent panel on bot ready
@@ -295,11 +303,71 @@ client.on("interactionCreate", async (interaction) => {
                     options
                 }]
             }]});
+        } else if (action === "whitelist") {
+            // Show member select to whitelist
+            const guild2 = interaction.guild;
+            const guildMembers = await guild2.members.fetch();
+            const options = guildMembers
+                .filter(m => m.id !== member.id && !m.user.bot)
+                .map(m => ({ label: m.displayName, value: m.id }))
+                .slice(0, 25);
+            if (options.length === 0) return interaction.reply({ ephemeral: true, content: "No members to whitelist." });
+            await interaction.reply({ ephemeral: true, components: [{
+                type: 1, components: [{
+                    type: 3, custom_id: "vc_whitelistselect",
+                    placeholder: "Select a member to whitelist",
+                    options
+                }]
+            }]});
+
+        } else if (action === "unwhitelist") {
+            // Show members who have connect permission to unwhitelist
+            const overwrites = channel.permissionOverwrites.cache;
+            const options = [];
+            for (const [id, overwrite] of overwrites) {
+                if (overwrite.type === 1 && id !== member.id) { // type 1 = member
+                    const m = interaction.guild.members.cache.get(id);
+                    if (m && !m.user.bot) options.push({ label: m.displayName, value: m.id });
+                }
+            }
+            if (options.length === 0) return interaction.reply({ ephemeral: true, content: "No whitelisted members to remove." });
+            await interaction.reply({ ephemeral: true, components: [{
+                type: 1, components: [{
+                    type: 3, custom_id: "vc_unwhitelistselect",
+                    placeholder: "Select a member to unwhitelist",
+                    options
+                }]
+            }]});
+
         } else if (action === "activity") {
             interaction.reply({ ephemeral: true, content: "🎮 To start an activity, right-click the voice channel → Activities." });
         }
     } catch (err) {
         interaction.reply({ ephemeral: true, content: `Error: ${err.message}` }).catch(() => {});
+    }
+});
+
+// Handle whitelist/unwhitelist select menus
+client.on("interactionCreate", async (interaction) => {
+    if (!interaction.isStringSelectMenu()) return;
+    const [prefix, action] = interaction.customId.split("_");
+    if (prefix !== "vc") return;
+
+    const member  = interaction.member;
+    const channel = member.voice?.channel;
+    const data    = channel ? tempChannels.get(channel.id) : null;
+    if (!channel || !data) return interaction.reply({ content: "You are not in a bot-created voice channel.", ephemeral: true });
+    if (data.ownerId !== member.id) return interaction.reply({ content: "Only the channel owner can do this.", ephemeral: true });
+
+    const targetId = interaction.values[0];
+    const target   = interaction.guild.members.cache.get(targetId);
+
+    if (action === "whitelistselect") {
+        await channel.permissionOverwrites.edit(targetId, { Connect: true, ViewChannel: true });
+        interaction.reply({ ephemeral: true, content: `✅ **${target?.displayName}** has been whitelisted and can now join your channel.` });
+    } else if (action === "unwhitelistselect") {
+        await channel.permissionOverwrites.delete(targetId);
+        interaction.reply({ ephemeral: true, content: `❌ **${target?.displayName}** has been removed from the whitelist.` });
     }
 });
 
