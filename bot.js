@@ -1156,6 +1156,48 @@ Please describe your issue in detail and a staff member will assist you shortly.
         try {
             const ticketUser = await client.users.fetch(data.userId).catch(() => null);
 
+            // Build transcript
+            let transcript = `📋 Ticket Transcript — ${channel.name}\n`;
+            transcript += `Opened by: ${ticketUser?.tag || data.userId}\n`;
+            transcript += `Category: ${data.category}\n`;
+            transcript += `Date: ${new Date().toUTCString()}\n`;
+            transcript += `${"=".repeat(50)}\n\n`;
+
+            // Fetch all messages
+            let allMessages = [];
+            let lastId = null;
+            while (true) {
+                const options = { limit: 100 };
+                if (lastId) options.before = lastId;
+                const batch = await channel.messages.fetch(options);
+                if (batch.size === 0) break;
+                allMessages = allMessages.concat([...batch.values()]);
+                lastId = batch.last().id;
+                if (batch.size < 100) break;
+            }
+            allMessages.reverse();
+            for (const msg of allMessages) {
+                const time = msg.createdAt.toUTCString();
+                transcript += `[${time}] ${msg.author.tag}: ${msg.content || "(embed/attachment)"}\n`;
+            }
+
+            // Send transcript to user via DM
+            if (ticketUser) {
+                try {
+                    const buffer = Buffer.from(transcript, "utf-8");
+                    await ticketUser.send({
+                        embeds: [new EmbedBuilder()
+                            .setTitle("🎫 Your ticket has been closed")
+                            .setDescription(`Your **${data.category}** ticket has been archived. A transcript is attached below.`)
+                            .setColor(0x787b86)
+                            .setTimestamp()],
+                        files: [{ attachment: buffer, name: `transcript-${channel.name}.txt` }]
+                    });
+                } catch {
+                    console.log("[Tickets] Could not DM transcript to user (DMs may be closed)");
+                }
+            }
+
             // Archive: move to archive category and remove user's send permissions
             const archivePerms = [
                 { id: guild.id,        deny:  ["ViewChannel"] },
