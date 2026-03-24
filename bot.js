@@ -773,6 +773,23 @@ client.on("interactionCreate", async (interaction) => {
             await interaction.editReply({ embeds: [embed("Shutdown Sent", `All servers will shut down.
 **Reason:** ${reason}`, 0xff4444)] });
 
+        } else if (cmd === "slowmode") {
+            const seconds = interaction.options.getInteger("seconds");
+            const channel = interaction.options.getChannel("channel") || interaction.channel;
+            await channel.setRateLimitPerUser(seconds);
+            const msg = seconds === 0 ? "Slowmode disabled." : `Slowmode set to **${seconds}s**.`;
+            await interaction.editReply({ embeds: [embed("⏱️ Slowmode", `${msg} in <#${channel.id}>`, 0xf5a623)] });
+
+        } else if (cmd === "lock") {
+            const channel = interaction.options.getChannel("channel") || interaction.channel;
+            await channel.permissionOverwrites.edit(interaction.guild.id, { SendMessages: false });
+            await interaction.editReply({ embeds: [embed("🔒 Channel Locked", `<#${channel.id}> has been locked.`, 0xff4444)] });
+
+        } else if (cmd === "unlock") {
+            const channel = interaction.options.getChannel("channel") || interaction.channel;
+            await channel.permissionOverwrites.edit(interaction.guild.id, { SendMessages: null });
+            await interaction.editReply({ embeds: [embed("🔓 Channel Unlocked", `<#${channel.id}> has been unlocked.`, 0x26a69a)] });
+
         } else if (cmd === "purge") {
             const amount = interaction.options.getInteger("amount");
             try {
