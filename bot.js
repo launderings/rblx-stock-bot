@@ -109,6 +109,19 @@ process.on("unhandledRejection", (err) => {
     console.error("[Bot] Unhandled rejection:", err.message);
 });
 
+// Auto-react to messages in polls channel
+const POLLS_CHANNEL_ID = process.env.POLLS_CHANNEL_ID;
+client.on("messageCreate", async (message) => {
+    if (message.author.bot) return;
+    if (!POLLS_CHANNEL_ID || message.channelId !== POLLS_CHANNEL_ID) return;
+    try {
+        await message.react("⬆️");
+        await message.react("⬇️");
+    } catch (err) {
+        console.error("[Polls] Failed to react:", err.message);
+    }
+});
+
 // ================================================================
 // JOIN TO CREATE VC — Persistent VoiceMaster Panel
 // ================================================================
