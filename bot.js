@@ -588,6 +588,66 @@ client.on("interactionCreate", async (interaction) => {
         return;
     }
 
+    if (cmd === "compare") {
+        await interaction.deferReply();
+        try {
+            const sym1 = interaction.options.getString("stock1");
+            const sym2 = interaction.options.getString("stock2");
+
+            const data = await dsRequest("GET", "StockMarket_v6", "MarketStateV2");
+            if (!data || !data.markets) return interaction.editReply({ embeds: [embed("No Data", "Market data not available yet.", 0x787b86)] });
+
+            const getStats = (sym) => {
+                const market = data.markets[sym];
+                if (!market || !market.candles || market.candles.length === 0) return null;
+                const candles = market.candles;
+                const last    = candles[candles.length - 1];
+                const first   = candles[0];
+                const chg     = last.close - first.open;
+                const chgPct  = ((chg / first.open) * 100).toFixed(2);
+                const high    = Math.max(...candles.map(c => c.high));
+                const low     = Math.min(...candles.map(c => c.low));
+                const vol     = candles.reduce((a, c) => a + (c.vol || 0), 0);
+                return { price: last.close, chg, chgPct, high, low, vol };
+            };
+
+            const s1 = getStats(sym1);
+            const s2 = getStats(sym2);
+
+            if (!s1 || !s2) return interaction.editReply({ embeds: [embed("No Data", "Could not find data for one or both stocks.", 0xff4444)] });
+
+            const arrow = (v) => v >= 0 ? "🟢 +" : "🔴 ";
+            const winner = s1.chgPct > s2.chgPct ? sym1 : s2.chgPct > s1.chgPct ? sym2 : "Tied";
+
+            await interaction.editReply({
+                embeds: [new EmbedBuilder()
+                    .setTitle(`📊 ${sym1} vs ${sym2}`)
+                    .addFields(
+                        { name: "​",           value: `**${sym1}**`,                                         inline: true },
+                        { name: "​",           value: "vs",                                                  inline: true },
+                        { name: "​",           value: `**${sym2}**`,                                         inline: true },
+                        { name: "Price",            value: formatDollar(s1.price),                                inline: true },
+                        { name: "​",           value: "​",                                              inline: true },
+                        { name: "Price",            value: formatDollar(s2.price),                                inline: true },
+                        { name: "Change",           value: `${arrow(s1.chg)}${s1.chgPct}%`,                      inline: true },
+                        { name: "​",           value: "​",                                              inline: true },
+                        { name: "Change",           value: `${arrow(s2.chg)}${s2.chgPct}%`,                      inline: true },
+                        { name: "Session High",     value: formatDollar(s1.high),                                 inline: true },
+                        { name: "​",           value: "​",                                              inline: true },
+                        { name: "Session High",     value: formatDollar(s2.high),                                 inline: true },
+                        { name: "Session Low",      value: formatDollar(s1.low),                                  inline: true },
+                        { name: "​",           value: "​",                                              inline: true },
+                        { name: "Session Low",      value: formatDollar(s2.low),                                  inline: true },
+                        { name: "🏆 Better Performer", value: winner === "Tied" ? "Tied" : `**${winner}** is outperforming`, inline: false },
+                    )
+                    .setColor(s1.chgPct >= s2.chgPct ? 0x26a69a : 0xff4444)
+                    .setTimestamp()
+                    .setFooter({ text: "RBLX Stock Market" })]
+            });
+        } catch (err) { await interaction.editReply(`Error: ${err.message}`); }
+        return;
+    }
+
     if (cmd === "marketstatus") {
         await interaction.deferReply();
         try {
