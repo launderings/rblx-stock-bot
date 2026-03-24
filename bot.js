@@ -968,6 +968,7 @@ const TICKET_PANEL_ID     = process.env.TICKET_PANEL_ID;
 const TICKET_LOG_ID       = process.env.TICKET_LOG_ID;
 const TICKET_STAFF_ROLE_ID = process.env.TICKET_STAFF_ROLE_ID; // role that can see all tickets
 const activeTickets       = new Map(); // channelId -> { userId, category }
+let ticketCounter         = 0; // increments for each new ticket
 
 const TICKET_CATEGORIES = {
     support:   { label: "Support",     emoji: "🎧", color: 0x2962ff, description: "Get help with the game" },
@@ -1011,27 +1012,29 @@ async function ensureTicketPanel(guild) {
         console.log("[Tickets] Panel already exists");
     }
 
-    // Restore activeTickets from existing ticket channels (survives bot restart)
-    if (TICKET_CATEGORY_ID) {
-        const category = guild.channels.cache.get(TICKET_CATEGORY_ID);
-        if (category) {
-            for (const [id, channel] of guild.channels.cache) {
-                if (channel.parentId === TICKET_CATEGORY_ID && channel.type === 0 && !channel.name.startsWith("archived-")) {
-                    // Determine category from channel name prefix
-                    const catKey = Object.keys(TICKET_CATEGORIES).find(k => channel.name.startsWith(k));
-                    // Find the user by checking permission overwrites
+    // Restore activeTickets and ticket counter from existing channels
+    const allCats = [TICKET_CATEGORY_ID, TICKET_ARCHIVE_ID].filter(Boolean);
+    for (const catId of allCats) {
+        for (const [id, channel] of guild.channels.cache) {
+            if (channel.parentId === catId && channel.type === 0) {
+                // Parse ticket number from name like "ticket-0042"
+                const match = channel.name.match(/ticket-(\d+)/);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    if (num > ticketCounter) ticketCounter = num;
+                }
+                // Restore active tickets (non-archived only)
+                if (catId === TICKET_CATEGORY_ID && !channel.name.startsWith("archived-")) {
                     const userOverwrite = channel.permissionOverwrites.cache.find(o => o.type === 1);
                     if (userOverwrite) {
-                        activeTickets.set(id, {
-                            userId: userOverwrite.id,
-                            category: catKey ? TICKET_CATEGORIES[catKey].label : "Support"
-                        });
+                        activeTickets.set(id, { userId: userOverwrite.id, category: "Support" });
                         console.log(`[Tickets] Restored ticket: ${channel.name}`);
                     }
                 }
             }
         }
     }
+    console.log(`[Tickets] Counter resumed at ${ticketCounter}`);
 }
 
 async function logTicketAction(guild, action, user, channel, category) {
@@ -1074,8 +1077,10 @@ client.on("interactionCreate", async (interaction) => {
 
         try {
             // Create ticket channel
+            ticketCounter++;
+            const ticketNum = String(ticketCounter).padStart(4, "0");
             const ticketChannel = await guild.channels.create({
-                name: `${category}-${member.user.username}`,
+                name: `ticket-${ticketNum}`,
                 type: 0, // text channel
                 parent: TICKET_CATEGORY_ID ?? null,
                 permissionOverwrites: [
