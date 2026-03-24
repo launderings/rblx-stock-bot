@@ -42,6 +42,11 @@ const commands = [
         .setDescription("See the top 10 wealthiest players"),
 
     new SlashCommandBuilder()
+        .setName("userinfo")
+        .setDescription("View info about a user including their Roblox account and in-game stats")
+        .addUserOption(o => o.setName("user").setDescription("User to look up (defaults to yourself)")),
+
+    new SlashCommandBuilder()
         .setName("marketstatus")
         .setDescription("See live prices and % change for all 19 stocks"),
 
