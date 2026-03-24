@@ -98,9 +98,9 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 client.once("ready", async () => {
     console.log(`[Bot] Logged in as ${client.user.tag}`);
     setInterval(pollLinkVerifications, 5000);
-    // Post persistent VC panel in all guilds
     for (const guild of client.guilds.cache.values()) {
         await ensurePersistentPanel(guild).catch(console.error);
+        await ensureTicketPanel(guild).catch(console.error);
     }
 });
 
@@ -945,6 +945,214 @@ async function resolveDealer(interaction, game, gameId) {
     });
 }
 
+
+// ================================================================
+// TICKET SYSTEM
+// ================================================================
+const TICKET_CATEGORY_ID  = process.env.TICKET_CATEGORY_ID;   // category for open tickets
+const TICKET_ARCHIVE_ID   = process.env.TICKET_ARCHIVE_ID;    // category for archived tickets
+const TICKET_PANEL_ID     = process.env.TICKET_PANEL_ID;      // channel to post ticket panel
+const TICKET_LOG_ID       = process.env.TICKET_LOG_ID;        // channel to log ticket actions
+const activeTickets       = new Map(); // channelId -> { userId, category }
+
+const TICKET_CATEGORIES = {
+    support:   { label: "Support",     emoji: "🎧", color: 0x2962ff, description: "Get help with the game" },
+    bugreport: { label: "Bug Report",  emoji: "🐛", color: 0xff9800, description: "Report a bug or issue" },
+    appeal:    { label: "Appeal",      emoji: "⚖️", color: 0xff4444, description: "Appeal a ban or punishment" },
+};
+
+function buildTicketPanel() {
+    const embed = new EmbedBuilder()
+        .setTitle("🎫 Support Tickets")
+        .setDescription("Click a button below to open a ticket. Please be descriptive and patient.")
+        .addFields(
+            { name: "🎧 Support",    value: "Get help with the game",          inline: true },
+            { name: "🐛 Bug Report", value: "Report a bug or issue",            inline: true },
+            { name: "⚖️ Appeal",     value: "Appeal a ban or punishment",       inline: true },
+        )
+        .setColor(0x2962ff)
+        .setFooter({ text: "Grind The Graph • Support" });
+
+    const row = {
+        type: 1, components: [
+            { type: 2, style: 1, emoji: "🎧", label: "Support",    custom_id: "ticket_open_support"   },
+            { type: 2, style: 2, emoji: "🐛", label: "Bug Report", custom_id: "ticket_open_bugreport" },
+            { type: 2, style: 4, emoji: "⚖️", label: "Appeal",     custom_id: "ticket_open_appeal"    },
+        ]
+    };
+
+    return { embeds: [embed], components: [row] };
+}
+
+async function ensureTicketPanel(guild) {
+    if (!TICKET_PANEL_ID) return;
+    const ch = guild.channels.cache.get(TICKET_PANEL_ID);
+    if (!ch) return;
+    const messages = await ch.messages.fetch({ limit: 20 });
+    const existing = messages.find(m => m.author.id === client.user.id && m.embeds[0]?.title === "🎫 Support Tickets");
+    if (!existing) {
+        await ch.send(buildTicketPanel());
+        console.log("[Tickets] Panel posted");
+    } else {
+        console.log("[Tickets] Panel already exists");
+    }
+}
+
+async function logTicketAction(guild, action, user, channel, category) {
+    if (!TICKET_LOG_ID) return;
+    const logCh = guild.channels.cache.get(TICKET_LOG_ID);
+    if (!logCh) return;
+    await logCh.send({ embeds: [new EmbedBuilder()
+        .setTitle(`🎫 Ticket ${action}`)
+        .addFields(
+            { name: "User",     value: `<@${user.id}> (${user.tag})`, inline: true },
+            { name: "Category", value: category,                       inline: true },
+            { name: "Channel",  value: channel ? `<#${channel.id}>` : "Deleted", inline: true },
+        )
+        .setColor(action === "Opened" ? 0x26a69a : action === "Closed" ? 0xff4444 : 0xf5a623)
+        .setTimestamp()] });
+}
+
+// Handle ticket button interactions
+client.on("interactionCreate", async (interaction) => {
+    if (!interaction.isButton()) return;
+    if (!interaction.customId.startsWith("ticket_")) return;
+
+    const [, action, ...rest] = interaction.customId.split("_");
+    const guild  = interaction.guild;
+    const member = interaction.member;
+
+    // Open ticket
+    if (action === "open") {
+        const category = rest[0];
+        const catData  = TICKET_CATEGORIES[category];
+        if (!catData) return;
+
+        // Check if user already has an open ticket
+        const existing = [...activeTickets.entries()].find(([, d]) => d.userId === member.id);
+        if (existing) {
+            return interaction.reply({ ephemeral: true, content: `You already have an open ticket: <#${existing[0]}>` });
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+            // Create ticket channel
+            const ticketChannel = await guild.channels.create({
+                name: `${category}-${member.user.username}`,
+                type: 0, // text channel
+                parent: TICKET_CATEGORY_ID || null,
+                permissionOverwrites: [
+                    { id: guild.id,    deny:  ["ViewChannel"] },
+                    { id: member.id,   allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] },
+                    ...(ADMIN_ROLE_ID ? [{ id: ADMIN_ROLE_ID, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory", "ManageMessages"] }] : []),
+                ],
+            });
+
+            activeTickets.set(ticketChannel.id, { userId: member.id, category: catData.label });
+
+            // Send ticket welcome message
+            const closeRow = { type: 1, components: [
+                { type: 2, style: 4, emoji: "🔒", label: "Close Ticket", custom_id: "ticket_close" },
+            ]};
+
+            await ticketChannel.send({
+                content: `<@${member.id}>`,
+                embeds: [new EmbedBuilder()
+                    .setTitle(`${catData.emoji} ${catData.label} Ticket`)
+                    .setDescription(`Hello ${member.displayName}, thanks for opening a ticket!
+
+Please describe your issue in detail and a staff member will assist you shortly.`)
+                    .addFields({ name: "Category", value: catData.label, inline: true })
+                    .setColor(catData.color)
+                    .setTimestamp()
+                    .setFooter({ text: "Click 🔒 to close this ticket" })],
+                components: [closeRow],
+            });
+
+            await logTicketAction(guild, "Opened", member.user, ticketChannel, catData.label);
+            await interaction.editReply({ content: `✅ Your ticket has been created: <#${ticketChannel.id}>` });
+        } catch (err) {
+            await interaction.editReply(`Error creating ticket: ${err.message}`);
+        }
+        return;
+    }
+
+    // Close ticket
+    if (action === "close") {
+        const channel = interaction.channel;
+        const data    = activeTickets.get(channel.id);
+
+        if (!data) return interaction.reply({ ephemeral: true, content: "This is not an active ticket channel." });
+
+        const isOwner = data.userId === member.id;
+        const isAdmin = ADMIN_ROLE_ID && member.roles.cache.has(ADMIN_ROLE_ID);
+        if (!isOwner && !isAdmin) return interaction.reply({ ephemeral: true, content: "Only the ticket owner or staff can close this." });
+
+        await interaction.deferReply();
+
+        try {
+            // Confirm close
+            await interaction.editReply({ embeds: [new EmbedBuilder()
+                .setTitle("🔒 Close Ticket?")
+                .setDescription("This ticket will be archived. Click confirm to proceed.")
+                .setColor(0xff4444)],
+                components: [{ type: 1, components: [
+                    { type: 2, style: 4, label: "Confirm Close", custom_id: "ticket_confirmclose" },
+                    { type: 2, style: 2, label: "Cancel",        custom_id: "ticket_cancelclose"  },
+                ]}]
+            });
+        } catch (err) {
+            interaction.editReply(`Error: ${err.message}`);
+        }
+        return;
+    }
+
+    // Confirm close
+    if (action === "confirmclose") {
+        const channel = interaction.channel;
+        const data    = activeTickets.get(channel.id);
+        if (!data) return;
+
+        await interaction.deferUpdate();
+
+        try {
+            const ticketUser = await client.users.fetch(data.userId).catch(() => null);
+
+            // Archive: move to archive category and remove user's send permissions
+            const archivePerms = [
+                { id: guild.id,        deny:  ["ViewChannel"] },
+                { id: data.userId,     allow: ["ViewChannel", "ReadMessageHistory"], deny: ["SendMessages"] },
+                ...(ADMIN_ROLE_ID ? [{ id: ADMIN_ROLE_ID, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] }] : []),
+            ];
+
+            await channel.setParent(TICKET_ARCHIVE_ID || channel.parentId, { lockPermissions: false });
+            await channel.permissionOverwrites.set(archivePerms);
+            await channel.setName(`archived-${channel.name}`);
+
+            await channel.send({ embeds: [new EmbedBuilder()
+                .setTitle("🔒 Ticket Archived")
+                .setDescription(`This ticket was closed by <@${interaction.member.id}>`)
+                .setColor(0x787b86)
+                .setTimestamp()] });
+
+            activeTickets.delete(channel.id);
+            await logTicketAction(guild, "Closed", interaction.member.user, channel, data.category);
+        } catch (err) {
+            console.error("[Tickets] Error archiving:", err.message);
+        }
+        return;
+    }
+
+    // Cancel close
+    if (action === "cancelclose") {
+        await interaction.update({ content: "Cancelled.", embeds: [], components: [] });
+        return;
+    }
+});
+
+// Post ticket panel on ready
+client.once("ready", async () => {});  // placeholder - handled in main ready event
 client.login(DISCORD_TOKEN);
 
 const app = express();
