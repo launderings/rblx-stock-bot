@@ -949,10 +949,11 @@ async function resolveDealer(interaction, game, gameId) {
 // ================================================================
 // TICKET SYSTEM
 // ================================================================
-const TICKET_CATEGORY_ID  = process.env.TICKET_CATEGORY_ID;   // category for open tickets
-const TICKET_ARCHIVE_ID   = process.env.TICKET_ARCHIVE_ID;    // category for archived tickets
-const TICKET_PANEL_ID     = process.env.TICKET_PANEL_ID;      // channel to post ticket panel
-const TICKET_LOG_ID       = process.env.TICKET_LOG_ID;        // channel to log ticket actions
+const TICKET_CATEGORY_ID  = process.env.TICKET_CATEGORY_ID;
+const TICKET_ARCHIVE_ID   = process.env.TICKET_ARCHIVE_ID;
+const TICKET_PANEL_ID     = process.env.TICKET_PANEL_ID;
+const TICKET_LOG_ID       = process.env.TICKET_LOG_ID;
+const TICKET_STAFF_ROLE_ID = process.env.TICKET_STAFF_ROLE_ID; // role that can see all tickets
 const activeTickets       = new Map(); // channelId -> { userId, category }
 
 const TICKET_CATEGORIES = {
@@ -1045,7 +1046,8 @@ client.on("interactionCreate", async (interaction) => {
                 permissionOverwrites: [
                     { id: guild.id,    deny:  ["ViewChannel"] },
                     { id: member.id,   allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] },
-                    ...(ADMIN_ROLE_ID ? [{ id: ADMIN_ROLE_ID, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory", "ManageMessages"] }] : []),
+                    ...(ADMIN_ROLE_ID      ? [{ id: ADMIN_ROLE_ID,       allow: ["ViewChannel", "SendMessages", "ReadMessageHistory", "ManageMessages"] }] : []),
+                    ...(TICKET_STAFF_ROLE_ID ? [{ id: TICKET_STAFF_ROLE_ID, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] }] : []),
                 ],
             });
 
@@ -1123,7 +1125,8 @@ Please describe your issue in detail and a staff member will assist you shortly.
             const archivePerms = [
                 { id: guild.id,        deny:  ["ViewChannel"] },
                 { id: data.userId,     allow: ["ViewChannel", "ReadMessageHistory"], deny: ["SendMessages"] },
-                ...(ADMIN_ROLE_ID ? [{ id: ADMIN_ROLE_ID, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] }] : []),
+                ...(ADMIN_ROLE_ID        ? [{ id: ADMIN_ROLE_ID,         allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] }] : []),
+                ...(TICKET_STAFF_ROLE_ID ? [{ id: TICKET_STAFF_ROLE_ID,  allow: ["ViewChannel", "ReadMessageHistory"] }] : []),
             ];
 
             await channel.setParent(TICKET_ARCHIVE_ID || channel.parentId, { lockPermissions: false });
