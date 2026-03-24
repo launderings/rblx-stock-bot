@@ -1146,7 +1146,7 @@ Please describe your issue in detail and a staff member will assist you shortly.
             // Archive: move to archive category and remove user's send permissions
             const archivePerms = [
                 { id: guild.id,        deny:  ["ViewChannel"] },
-                { id: data.userId,     allow: ["ViewChannel", "ReadMessageHistory"], deny: ["SendMessages"] },
+                { id: data.userId,     deny:  ["ViewChannel"] },  // user can no longer see archived ticket
                 ...(ADMIN_ROLE_ID        ? [{ id: ADMIN_ROLE_ID,         allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] }] : []),
                 ...(TICKET_STAFF_ROLE_ID ? [{ id: TICKET_STAFF_ROLE_ID,  allow: ["ViewChannel", "ReadMessageHistory"] }] : []),
             ];
