@@ -534,6 +534,60 @@ client.on("interactionCreate", async (interaction) => {
         return;
     }
 
+    if (cmd === "userinfo") {
+        await interaction.deferReply();
+        try {
+            const target = interaction.options.getUser("user") || interaction.user;
+            const member = interaction.guild.members.cache.get(target.id);
+
+            // Check if linked to Roblox
+            const link = await getLinkedRobloxId(target.id).catch(() => null);
+            let robloxField = "Not linked";
+            let balanceField = "N/A";
+            let netWorthField = "N/A";
+            let sharesField = "N/A";
+
+            if (link) {
+                robloxField = `${link.robloxUsername} (\`${link.robloxUserId}\`)`;
+                const data = await getPlayerData(link.robloxUserId).catch(() => null);
+                if (data) {
+                    balanceField = formatDollar(data.balance);
+                    const shares = data.shares || {};
+                    const totalShares = Object.values(shares).reduce((a, b) => a + b, 0);
+                    sharesField = totalShares > 0
+                        ? Object.entries(shares).filter(([,v]) => v > 0).map(([k,v]) => `${k}: ${v}`).join(", ")
+                        : "No shares";
+                }
+            }
+
+            const roles = member
+                ? [...member.roles.cache.values()].filter(r => r.id !== interaction.guild.id).map(r => `<@&${r.id}>`).join(" ") || "None"
+                : "N/A";
+
+            const joinedAt = member ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : "N/A";
+            const createdAt = `<t:${Math.floor(target.createdTimestamp / 1000)}:R>`;
+
+            await interaction.editReply({
+                embeds: [new EmbedBuilder()
+                    .setTitle(`👤 ${target.username}`)
+                    .setThumbnail(target.displayAvatarURL({ size: 256 }))
+                    .addFields(
+                        { name: "🆔 User ID",       value: target.id,       inline: true },
+                        { name: "📅 Account Created", value: createdAt,      inline: true },
+                        { name: "📥 Joined Server",  value: joinedAt,        inline: true },
+                        { name: "🎮 Roblox Account", value: robloxField,     inline: false },
+                        { name: "💵 Balance",        value: balanceField,    inline: true },
+                        { name: "📈 Shares",         value: sharesField,     inline: true },
+                        { name: "🎭 Roles",          value: roles,           inline: false },
+                    )
+                    .setColor(member?.displayColor || 0x2962ff)
+                    .setTimestamp()
+                    .setFooter({ text: "RBLX Stock Market" })]
+            });
+        } catch (err) { await interaction.editReply(`Error: ${err.message}`); }
+        return;
+    }
+
     if (cmd === "marketstatus") {
         await interaction.deferReply();
         try {
