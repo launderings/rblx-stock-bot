@@ -47,6 +47,12 @@ const commands = [
         .addUserOption(o => o.setName("user").setDescription("User to look up (defaults to yourself)")),
 
     new SlashCommandBuilder()
+        .setName("compare")
+        .setDescription("Compare two stocks side by side")
+        .addStringOption(o => o.setName("stock1").setDescription("First stock").setRequired(true).addChoices(...stockChoices))
+        .addStringOption(o => o.setName("stock2").setDescription("Second stock").setRequired(true).addChoices(...stockChoices)),
+
+    new SlashCommandBuilder()
         .setName("marketstatus")
         .setDescription("See live prices and % change for all 19 stocks"),
 
