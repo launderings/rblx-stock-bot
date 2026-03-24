@@ -145,6 +145,22 @@ const commands = [
         .addStringOption(o => o.setName("reason").setDescription("Reason shown to players")),
 
     new SlashCommandBuilder()
+        .setName("slowmode")
+        .setDescription("Set slowmode in a channel")
+        .addIntegerOption(o => o.setName("seconds").setDescription("Slowmode in seconds (0 to disable)").setRequired(true).setMinValue(0).setMaxValue(21600))
+        .addChannelOption(o => o.setName("channel").setDescription("Channel to set slowmode in (defaults to current)")),
+
+    new SlashCommandBuilder()
+        .setName("lock")
+        .setDescription("Lock a channel so members can't send messages")
+        .addChannelOption(o => o.setName("channel").setDescription("Channel to lock (defaults to current)")),
+
+    new SlashCommandBuilder()
+        .setName("unlock")
+        .setDescription("Unlock a channel")
+        .addChannelOption(o => o.setName("channel").setDescription("Channel to unlock (defaults to current)")),
+
+    new SlashCommandBuilder()
         .setName("purge")
         .setDescription("Delete messages from this channel (admin only)")
         .addIntegerOption(o => o.setName("amount").setDescription("Number of messages to delete (1-100)").setRequired(true).setMinValue(1).setMaxValue(100)),
