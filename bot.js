@@ -1093,8 +1093,9 @@ client.on("interactionCreate", async (interaction) => {
                 { type: 2, style: 4, emoji: "🔒", label: "Close Ticket", custom_id: "ticket_close" },
             ]};
 
+            const staffPing = TICKET_STAFF_ROLE_ID ? `<@&${TICKET_STAFF_ROLE_ID}>` : "";
             await ticketChannel.send({
-                content: `<@${member.id}>`,
+                content: `<@${member.id}> ${staffPing}`,
                 embeds: [new EmbedBuilder()
                     .setTitle(`${catData.emoji} ${catData.label} Ticket`)
                     .setDescription(`Hello ${member.displayName}, thanks for opening a ticket!
