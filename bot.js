@@ -997,6 +997,28 @@ async function ensureTicketPanel(guild) {
     } else {
         console.log("[Tickets] Panel already exists");
     }
+
+    // Restore activeTickets from existing ticket channels (survives bot restart)
+    if (TICKET_CATEGORY_ID) {
+        const category = guild.channels.cache.get(TICKET_CATEGORY_ID);
+        if (category) {
+            for (const [id, channel] of guild.channels.cache) {
+                if (channel.parentId === TICKET_CATEGORY_ID && channel.type === 0 && !channel.name.startsWith("archived-")) {
+                    // Determine category from channel name prefix
+                    const catKey = Object.keys(TICKET_CATEGORIES).find(k => channel.name.startsWith(k));
+                    // Find the user by checking permission overwrites
+                    const userOverwrite = channel.permissionOverwrites.cache.find(o => o.type === 1);
+                    if (userOverwrite) {
+                        activeTickets.set(id, {
+                            userId: userOverwrite.id,
+                            category: catKey ? TICKET_CATEGORIES[catKey].label : "Support"
+                        });
+                        console.log(`[Tickets] Restored ticket: ${channel.name}`);
+                    }
+                }
+            }
+        }
+    }
 }
 
 async function logTicketAction(guild, action, user, channel, category) {
@@ -1042,7 +1064,7 @@ client.on("interactionCreate", async (interaction) => {
             const ticketChannel = await guild.channels.create({
                 name: `${category}-${member.user.username}`,
                 type: 0, // text channel
-                parent: TICKET_CATEGORY_ID || null,
+                parent: TICKET_CATEGORY_ID ?? null,
                 permissionOverwrites: [
                     { id: guild.id,    deny:  ["ViewChannel"] },
                     { id: member.id,   allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] },
