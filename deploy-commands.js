@@ -67,6 +67,11 @@ const commands = [
         .addUserOption(o => o.setName("member").setDescription("Member to unwhitelist").setRequired(true)),
 
     new SlashCommandBuilder()
+        .setName("slots")
+        .setDescription("Spin the slot machine using your in-game balance")
+        .addNumberOption(o => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1).setMaxValue(1000000)),
+
+    new SlashCommandBuilder()
         .setName("blackjack")
         .setDescription("Play blackjack using your in-game balance")
         .addNumberOption(o => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1).setMaxValue(1000000)),
