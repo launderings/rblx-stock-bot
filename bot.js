@@ -448,6 +448,38 @@ client.on("interactionCreate", async (interaction) => {
         return;
     }
 
+    if (cmd === "slots") {
+        await interaction.deferReply();
+        try {
+            const bet  = interaction.options.getNumber("bet");
+            const link = await getLinkedRobloxId(interaction.user.id);
+            if (!link) return interaction.editReply({ embeds: [embed("Not Linked", "Link your account first with `/link`.", 0xff4444)] });
+            const data = await getPlayerData(link.robloxUserId);
+            if (!data) return interaction.editReply({ embeds: [embed("No Data", "No game data found.", 0xff4444)] });
+            if (bet > data.balance) return interaction.editReply({ embeds: [embed("Insufficient Funds", `You only have ${formatDollar(data.balance)}.`, 0xff4444)] });
+
+            // Spin the reels
+            const reels = [spinSlot(), spinSlot(), spinSlot()];
+
+            // Calculate payout
+            let payout = 0;
+            if (reels[0].emoji === reels[1].emoji && reels[1].emoji === reels[2].emoji) {
+                // Triple match
+                payout = Math.floor(bet * reels[0].mult);
+            } else if (reels[0].emoji === reels[1].emoji || reels[1].emoji === reels[2].emoji || reels[0].emoji === reels[2].emoji) {
+                // Pair — return bet
+                payout = Math.floor(bet * 1.5);
+            }
+
+            const newBalance = data.balance - bet + payout;
+            await updateBalance(link.robloxUserId, newBalance);
+
+            await interaction.editReply({ embeds: [buildSlotsEmbed(reels, bet, payout, newBalance, "done")] });
+
+        } catch (err) { await interaction.editReply(`Error: ${err.message}`); }
+        return;
+    }
+
     if (cmd === "blackjack" || cmd === "bj") {
         await interaction.deferReply();
         try {
@@ -1370,6 +1402,50 @@ Please describe your issue in detail and a staff member will assist you shortly.
 
 // Post ticket panel on ready
 client.once("ready", async () => {});  // placeholder - handled in main ready event
+
+// ================================================================
+// SLOTS
+// ================================================================
+const SLOT_SYMBOLS = [
+    { emoji: "🍒", weight: 30, mult: 2   },
+    { emoji: "🍋", weight: 25, mult: 3   },
+    { emoji: "🍇", weight: 20, mult: 4   },
+    { emoji: "🔔", weight: 12, mult: 6   },
+    { emoji: "💎", weight: 8,  mult: 10  },
+    { emoji: "7️⃣",  weight: 4,  mult: 25  },
+    { emoji: "🎰", weight: 1,  mult: 100 },
+];
+
+function spinSlot() {
+    const total = SLOT_SYMBOLS.reduce((a, s) => a + s.weight, 0);
+    let rand = Math.random() * total;
+    for (const sym of SLOT_SYMBOLS) {
+        rand -= sym.weight;
+        if (rand <= 0) return sym;
+    }
+    return SLOT_SYMBOLS[0];
+}
+
+function buildSlotsEmbed(reels, bet, payout, balance, status) {
+    const display = reels.map(r => r.emoji).join("  |  ");
+    const color = payout > 0 ? 0x26a69a : 0xff4444;
+    let title = payout > 0 ? `🎰 Winner! +${formatDollar(payout)}` : "🎰 No luck this time...";
+    if (reels[0].emoji === reels[1].emoji && reels[1].emoji === reels[2].emoji && reels[0].emoji === "🎰") {
+        title = "🎉 JACKPOT!!!";
+    }
+    return new EmbedBuilder()
+        .setTitle(title)
+        .setDescription(`## ${display}`)
+        .addFields(
+            { name: "Bet",     value: formatDollar(bet),     inline: true },
+            { name: "Payout",  value: formatDollar(payout),  inline: true },
+            { name: "Balance", value: formatDollar(balance),  inline: true },
+        )
+        .setColor(color)
+        .setFooter({ text: "RBLX Stock Market Slots" })
+        .setTimestamp();
+}
+
 client.login(DISCORD_TOKEN);
 
 const app = express();
