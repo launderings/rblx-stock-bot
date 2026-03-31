@@ -18,9 +18,6 @@ const stockChoices = [
     { name: "BLDG - BlueLedger",           value: "BLDG" },
     { name: "NBMK - NorthBridge Markets",  value: "NBMK" },
     { name: "PMYD - PrimeYield",           value: "PMYD" },
-    { name: "NXCR - Nexcore Systems",      value: "NXCR" },
-    { name: "VLTX - Voltex Industries",    value: "VLTX" },
-    { name: "PLHR - Placeholder Corp",     value: "PLHR" },
 ];
 
 const commands = [
