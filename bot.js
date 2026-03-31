@@ -451,11 +451,13 @@ client.on("interactionCreate", async (interaction) => {
     if (cmd === "slots") {
         await interaction.deferReply();
         try {
-            const bet  = interaction.options.getNumber("bet");
+            const betInput2 = interaction.options.getString("bet").toLowerCase().trim();
             const link = await getLinkedRobloxId(interaction.user.id);
             if (!link) return interaction.editReply({ embeds: [embed("Not Linked", "Link your account first with `/link`.", 0xff4444)] });
             const data = await getPlayerData(link.robloxUserId);
             if (!data) return interaction.editReply({ embeds: [embed("No Data", "No game data found.", 0xff4444)] });
+            let bet = betInput2 === "max" ? data.balance : parseFloat(betInput2);
+            if (isNaN(bet) || bet <= 0) return interaction.editReply({ embeds: [embed("Invalid Bet", "Enter a number or 'max'.", 0xff4444)] });
             if (bet > data.balance) return interaction.editReply({ embeds: [embed("Insufficient Funds", `You only have ${formatDollar(data.balance)}.`, 0xff4444)] });
 
             // Spin the reels
@@ -480,14 +482,16 @@ client.on("interactionCreate", async (interaction) => {
         return;
     }
 
-    if (cmd === "blackjack" || cmd === "bj") {
+    if (cmd === "blackjack") {
         await interaction.deferReply();
         try {
-            const bet = interaction.options.getNumber("bet");
+            const betInput = interaction.options.getString("bet").toLowerCase().trim();
             const link = await getLinkedRobloxId(interaction.user.id);
             if (!link) return interaction.editReply({ embeds: [embed("Not Linked", "Link your account first with `/link`.", 0xff4444)] });
             const data = await getPlayerData(link.robloxUserId);
             if (!data) return interaction.editReply({ embeds: [embed("No Data", "No game data found.", 0xff4444)] });
+            let bet = betInput === "max" ? data.balance : parseFloat(betInput);
+            if (isNaN(bet) || bet <= 0) return interaction.editReply({ embeds: [embed("Invalid Bet", "Enter a number or 'max'.", 0xff4444)] });
             if (bet > data.balance) return interaction.editReply({ embeds: [embed("Insufficient Funds", `You only have ${formatDollar(data.balance)}.`, 0xff4444)] });
             if (bet < 1) return interaction.editReply({ embeds: [embed("Invalid Bet", "Minimum bet is $1.", 0xff4444)] });
 
