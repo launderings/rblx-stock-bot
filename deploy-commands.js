@@ -66,17 +66,12 @@ const commands = [
     new SlashCommandBuilder()
         .setName("slots")
         .setDescription("Spin the slot machine using your in-game balance")
-        .addNumberOption(o => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1).setMaxValue(1000000)),
+        .addStringOption(o => o.setName("bet").setDescription("Amount to bet or 'max'").setRequired(true)),
 
     new SlashCommandBuilder()
         .setName("blackjack")
         .setDescription("Play blackjack using your in-game balance")
-        .addNumberOption(o => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1).setMaxValue(1000000)),
-
-    new SlashCommandBuilder()
-        .setName("bj")
-        .setDescription("Play blackjack using your in-game balance (shortcut)")
-        .addNumberOption(o => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1).setMaxValue(1000000)),
+        .addStringOption(o => o.setName("bet").setDescription("Amount to bet or 'max'").setRequired(true)),
 
     // ── Admin ─────────────────────────────────────────────────
     new SlashCommandBuilder()
